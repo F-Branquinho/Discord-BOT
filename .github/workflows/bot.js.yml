@@ -23,4 +23,9 @@ jobs:
           npm install discord.js moment dotenv  # Instala as dependências necessárias
 
       - name: Run index.js
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          GUILD_ID: ${{ secrets.GUILD_ID }}
+          BIRTHDAY_CHANNEL_ID: ${{ secrets.BIRTHDAY_CHANNEL_ID }}
+          GENERAL_CHANNEL_ID: ${{ secrets.GENERAL_CHANNEL_ID }}
         run: node index.js  # Executa o arquivo index.js
