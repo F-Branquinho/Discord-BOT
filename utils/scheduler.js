@@ -17,9 +17,13 @@ function agendarVerificacao(client) {
     console.log(`⏳ Tempo restante até a verificação: ${(tempoRestante / 1000).toFixed(2)} segundos`);
 
     setTimeout(() => {
-        console.log("⏰ Executando verificação de aniversários...");
+        console.log("Executando verificação de aniversários...");
         verificarAniversarios(client);
-        setInterval(() => verificarAniversarios(client), 86400000); // Verifica diariamente (24h)
+
+        setTimeout(() => {
+            console.log("Bot executado por 15 minutos, saindo com código 200.");
+            process.exit(200);
+        }, 900000); 
     }, tempoRestante);
 }
 
