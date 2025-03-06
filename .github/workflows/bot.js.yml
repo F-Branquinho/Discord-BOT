@@ -1,0 +1,26 @@
+name: Run index.js daily at midnight
+
+# Adicionando o evento workflow_dispatch
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 00:00 UTC todos os dias
+  workflow_dispatch:  # Permite disparar manualmente via interface do GitHub
+
+jobs:
+  run-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'  # Usando Node.js 18
+
+      - name: Install dependencies
+        run: |
+          npm install discord.js moment dotenv  # Instala as dependências necessárias
+
+      - name: Run index.js
+        run: node index.js  # Executa o arquivo index.js
