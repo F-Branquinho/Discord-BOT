@@ -8,7 +8,7 @@ let aniversarios = [];
  */
 async function lerAniversarios(client) {
     console.log('Lendo aniversários...');
-    aniversarios = []; // Resetar a lista
+    aniversarios = [];
 
     const canalAniversarios = await client.channels.fetch(process.env.BIRTHDAY_CHANNEL_ID);
     if (!canalAniversarios) {
@@ -28,9 +28,17 @@ async function lerAniversarios(client) {
     const regex = /(\d{2}\/\d{2})\s-\s<@(\d+)>/g;
     let match;
 
+    const startTime = Date.now();
+    const timeout = 180 * 1000; // 180 segundos
+
     while ((match = regex.exec(mensagem.content))) {
-        const diaMes = match[1];  // Data no formato DD/MM
-        const userId = match[2];  // ID do usuário
+        if (Date.now() - startTime > timeout) {
+            console.warn("⏰ Tempo limite de 180s atingido. Parando o loop.");
+            break;
+        }
+
+        const diaMes = match[1];
+        const userId = match[2];
 
         aniversarios.push({ data: diaMes, userId });
         console.log(`🎂 Aniversário encontrado: ${diaMes} - <@${userId}>`);
