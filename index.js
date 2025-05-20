@@ -25,3 +25,10 @@ client.on('messageCreate', async (message) => {
 
 // Iniciar o bot
 client.login(process.env.BOT_TOKEN);
+
+if (process.env.CI) {
+    setTimeout(() => {
+        console.log('CI timeout atingido. A terminar o bot...');
+        process.exit(0);
+    }, 900000);
+}
