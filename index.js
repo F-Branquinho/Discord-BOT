@@ -30,5 +30,5 @@ if (process.env.CI) {
     setTimeout(() => {
         console.log('CI timeout atingido. A terminar o bot...');
         process.exit(0);
-    }, 900000);
+    }, 90000);
 }
