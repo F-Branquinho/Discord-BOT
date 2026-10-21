@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const config = require('./config');
-const { verificarAniversarios } = require('./birthdays');
+const { lerAniversarios, enviarResumoMensal, verificarAniversarios } = require('./birthdays');
 const { lerEstado, guardarEstado } = require('./state');
 
 const ESPERA_APOS_ERRO_MS = 5 * 60 * 1000;
@@ -41,11 +41,21 @@ async function executarVerificacao(client) {
 
     aCorrer = true;
     const enviados = new Set(estado.data === agora.data ? estado.enviados : []);
-    const guardar = (concluido) => guardarEstado({ data: agora.data, enviados: [...enviados], concluido });
+    const mesAtual = agora.data.slice(0, 7);
+    let resumo = estado.resumo ?? null; // último mês (AAAA-MM) com resumo enviado
+    const guardar = (concluido) => guardarEstado({ data: agora.data, enviados: [...enviados], concluido, resumo });
 
     try {
         console.log(`🎂 Checking birthdays for ${agora.data}...`);
-        await verificarAniversarios(client, agora, enviados, (userId) => {
+        const lista = await lerAniversarios(client);
+
+        if (config.MONTHLY_SUMMARY && agora.dia === 1 && resumo !== mesAtual) {
+            await enviarResumoMensal(client, lista, agora);
+            resumo = mesAtual;
+            guardar(false);
+        }
+
+        await verificarAniversarios(client, lista, agora, enviados, (userId) => {
             enviados.add(userId);
             guardar(false);
         });

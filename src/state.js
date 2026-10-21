@@ -7,7 +7,7 @@ const FICHEIRO_ESTADO = path.join(config.DATA_DIR, 'estado.json');
 fs.mkdirSync(config.DATA_DIR, { recursive: true });
 
 /**
- * @returns {{ data: string | null, enviados: string[], concluido: boolean }}
+ * @returns {{ data: string | null, enviados: string[], concluido: boolean, resumo?: string | null }}
  */
 function lerEstado() {
     try {

@@ -12,6 +12,7 @@ Bot de Discord que lê a lista de aniversários de um canal e dá os parabéns n
   O bot lê todas as mensagens do canal (até 500). Se alguém aparecer mais de uma vez, conta a mensagem mais recente.
 - Todos os dias, à hora `CHECK_TIME` no fuso `TIMEZONE` (agendado com cron), o bot relê a lista e envia os parabéns no canal geral.
 - O que já foi enviado fica guardado em `/app/data/estado.json` (volume Docker). Reiniciar o contentor não repete mensagens, e se o bot estiver em baixo à hora marcada, envia quando voltar (no mesmo dia).
+- No dia 1 de cada mês, envia também a lista dos aniversários desse mês (sem notificar ninguém).
 - Quem nasceu a 29/02 recebe os parabéns a 28/02 nos anos não bissextos.
 - Se a verificação falhar (por exemplo, o Discord está em baixo), volta a tentar de 5 em 5 minutos.
 
@@ -95,6 +96,7 @@ git pull && docker compose up -d --build    # atualizar
 | `TIMEZONE` | não | `Europe/Lisbon` | Fuso horário da verificação |
 | `CHECK_TIME` | não | `00:01` | Hora da verificação (HH:MM) |
 | `BIRTHDAY_MESSAGE` | não | `🎉 Hoje é o teu dia, {user}! 🎂 Feliz aniversário!` | `{user}` é substituído pela menção |
+| `MONTHLY_SUMMARY` | não | `true` | Lista dos aniversários do mês no dia 1 |
 
 ## Correr sem Docker
 

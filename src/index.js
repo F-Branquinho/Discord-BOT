@@ -1,6 +1,6 @@
 const { Client, Events, GatewayIntentBits } = require('discord.js');
 const config = require('./config');
-const { lerAniversarios, fazAnosHoje } = require('./birthdays');
+const { lerAniversarios, fazAnosHoje, mensagemResumoMensal } = require('./birthdays');
 const { agoraNoFuso, iniciarAgendador } = require('./scheduler');
 
 // --testar: mostra a lista lida do canal e quem faz anos hoje, sem enviar nada
@@ -27,6 +27,10 @@ async function testar() {
         console.log(`  ${data}  ${user?.tag ?? '(unknown)'} (${a.userId})${marca}`);
     }
     console.log(`\nNow: ${hoje.data} ${hoje.horaMinuto} in ${config.TIMEZONE}`);
+
+    const resumo = mensagemResumoMensal(lista, hoje);
+    console.log(`\n📅 Monthly summary preview (sent on day 1${config.MONTHLY_SUMMARY ? '' : ', disabled'}):`);
+    console.log(resumo ?? '(no birthdays this month, nothing would be sent)');
 }
 
 client.once(Events.ClientReady, async () => {

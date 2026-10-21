@@ -17,6 +17,7 @@ const config = {
     TIMEZONE: process.env.TIMEZONE?.trim() || 'Europe/Lisbon',
     CHECK_TIME: process.env.CHECK_TIME?.trim() || '00:01',
     BIRTHDAY_MESSAGE: process.env.BIRTHDAY_MESSAGE?.trim() || '🎉 Hoje é o teu dia, {user}! 🎂 Feliz aniversário!',
+    MONTHLY_SUMMARY: process.env.MONTHLY_SUMMARY?.trim().toLowerCase() !== 'false',
     DATA_DIR: path.resolve(process.env.DATA_DIR?.trim() || path.join(__dirname, '..', 'data')),
 };
 

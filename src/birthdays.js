@@ -57,23 +57,61 @@ function fazAnosHoje(aniversario, hoje) {
         && hoje.dia === 28 && hoje.mes === 2 && !eBissexto(hoje.ano);
 }
 
+async function obterCanalGeral(client) {
+    const canal = await client.channels.fetch(config.GENERAL_CHANNEL_ID);
+    if (!canal?.isTextBased()) {
+        throw new Error(`General channel ${config.GENERAL_CHANNEL_ID} not found or not a text channel`);
+    }
+    return canal;
+}
+
+/**
+ * Texto do resumo mensal, ou null se ninguém fizer anos nesse mês.
+ * @param {{ userId: string, dia: number, mes: number }[]} lista
+ * @param {{ mes: number, ano: number }} hoje
+ */
+function mensagemResumoMensal(lista, hoje) {
+    const doMes = lista.filter((a) => a.mes === hoje.mes).sort((a, b) => a.dia - b.dia);
+    if (doMes.length === 0) return null;
+
+    const nomeMes = new Intl.DateTimeFormat('pt-PT', { month: 'long', timeZone: 'UTC' })
+        .format(new Date(Date.UTC(hoje.ano, hoje.mes - 1, 1)));
+    const linhas = doMes.map((a) => {
+        const data = `${String(a.dia).padStart(2, '0')}/${String(a.mes).padStart(2, '0')}`;
+        return `• ${data} - <@${a.userId}>`;
+    });
+    return `📅 **Aniversários de ${nomeMes[0].toUpperCase()}${nomeMes.slice(1)}**\n${linhas.join('\n')}`;
+}
+
+/**
+ * Envia a lista de aniversários do mês. As menções não notificam ninguém,
+ * cada pessoa já é mencionada no dia de anos.
+ */
+async function enviarResumoMensal(client, lista, hoje) {
+    const conteudo = mensagemResumoMensal(lista, hoje);
+    if (!conteudo) {
+        console.log('📅 No birthdays this month, skipping monthly summary');
+        return;
+    }
+    const canalGeral = await obterCanalGeral(client);
+    await canalGeral.send({ content: conteudo, allowedMentions: { parse: [] } });
+    console.log('📅 Monthly summary sent');
+}
+
 /**
  * Envia os parabéns a quem faz anos hoje e ainda não os recebeu.
  * @param {import('discord.js').Client} client
+ * @param {{ userId: string, dia: number, mes: number }[]} lista
  * @param {{ dia: number, mes: number, ano: number }} hoje
  * @param {Set<string>} jaEnviados - IDs que já receberam mensagem hoje
  * @param {(userId: string) => void} aoEnviar - chamado após cada utilizador tratado
  */
-async function verificarAniversarios(client, hoje, jaEnviados, aoEnviar) {
-    const lista = await lerAniversarios(client);
+async function verificarAniversarios(client, lista, hoje, jaEnviados, aoEnviar) {
     const aniversariantes = lista.filter((a) => fazAnosHoje(a, hoje) && !jaEnviados.has(a.userId));
     console.log(`🔍 ${lista.length} birthdays in the list, ${aniversariantes.length} to celebrate today`);
     if (aniversariantes.length === 0) return;
 
-    const canalGeral = await client.channels.fetch(config.GENERAL_CHANNEL_ID);
-    if (!canalGeral?.isTextBased()) {
-        throw new Error(`General channel ${config.GENERAL_CHANNEL_ID} not found or not a text channel`);
-    }
+    const canalGeral = await obterCanalGeral(client);
 
     for (const { userId } of aniversariantes) {
         try {
@@ -94,4 +132,10 @@ async function verificarAniversarios(client, hoje, jaEnviados, aoEnviar) {
     }
 }
 
-module.exports = { lerAniversarios, fazAnosHoje, verificarAniversarios };
+module.exports = {
+    lerAniversarios,
+    fazAnosHoje,
+    mensagemResumoMensal,
+    enviarResumoMensal,
+    verificarAniversarios,
+};
