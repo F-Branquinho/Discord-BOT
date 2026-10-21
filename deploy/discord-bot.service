@@ -1,0 +1,21 @@
+[Unit]
+Description=Discord Birthday Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=discordbot
+Group=discordbot
+WorkingDirectory=/opt/discord-bot
+# Lido pelo systemd (root), por isso o .env pode ficar só legível pelo root
+EnvironmentFile=/opt/discord-bot/.env
+Environment=NODE_ENV=production
+Environment=DATA_DIR=/opt/discord-bot/data
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

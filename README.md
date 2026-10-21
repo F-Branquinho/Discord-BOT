@@ -20,7 +20,32 @@ Bot de Discord que lê a lista de aniversários de um canal e dá os parabéns n
 No [Developer Portal](https://discord.com/developers/applications) → Bot, ativa **Message Content Intent**.
 O bot precisa de **Ver canal** e **Ler histórico de mensagens** no canal de aniversários, e de **Enviar mensagens** no canal geral.
 
-## Instalação no homelab (Proxmox + Docker)
+## Instalação num LXC do Proxmox (recomendado)
+
+1. No Proxmox: **local → CT Templates → Templates**, descarrega `debian-12-standard`.
+2. **Create CT**: unprivileged, 1 core, 512 MB RAM, 4 GB disco, rede DHCP. Em **Options**, ativa **Start at boot**.
+3. Na consola do LXC, como root:
+   ```bash
+   apt update && apt install -y curl
+   bash -c "$(curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh)"
+   ```
+4. Preenche o `.env` e arranca:
+   ```bash
+   nano /opt/discord-bot/.env
+   systemctl restart discord-bot
+   journalctl -u discord-bot -f
+   ```
+
+O bot corre como serviço systemd (`discord-bot`), com utilizador próprio, e reinicia sozinho se falhar.
+
+```bash
+systemctl status discord-bot                              # estado
+journalctl -u discord-bot -f                              # logs
+cd /opt/discord-bot && node src/index.js --testar         # mostra a lista lida, sem enviar nada
+bash /opt/discord-bot/deploy/install.sh                   # atualizar para a versão mais recente
+```
+
+## Instalação com Docker
 
 Numa VM ou LXC com Docker e Docker Compose:
 
