@@ -6,3 +6,6 @@ yarn-error.log
 # ENV FILES
 .env
 
+
+# Estado do bot
+data/

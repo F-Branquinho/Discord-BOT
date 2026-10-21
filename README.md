@@ -1,1 +1,63 @@
-# Discord-BOT
+# Discord Birthday Bot
+
+Bot de Discord que lê a lista de aniversários de um canal e dá os parabéns no canal geral no dia certo. Corre 24/7 num contentor Docker.
+
+## Como funciona
+
+- No canal de aniversários, escreve uma ou mais mensagens com linhas no formato:
+  ```
+  25/12 - @Utilizador
+  03/07 - @OutroUtilizador
+  ```
+  O bot lê todas as mensagens do canal (até 500). Se alguém aparecer mais de uma vez, conta a mensagem mais recente.
+- Todos os dias, à hora `CHECK_TIME` no fuso `TIMEZONE` (agendado com cron), o bot relê a lista e envia os parabéns no canal geral.
+- O que já foi enviado fica guardado em `/app/data/estado.json` (volume Docker). Reiniciar o contentor não repete mensagens, e se o bot estiver em baixo à hora marcada, envia quando voltar (no mesmo dia).
+- Quem nasceu a 29/02 recebe os parabéns a 28/02 nos anos não bissextos.
+- Se a verificação falhar (por exemplo, o Discord está em baixo), volta a tentar de 5 em 5 minutos.
+
+## Requisitos no Discord
+
+No [Developer Portal](https://discord.com/developers/applications) → Bot, ativa **Message Content Intent**.
+O bot precisa de **Ver canal** e **Ler histórico de mensagens** no canal de aniversários, e de **Enviar mensagens** no canal geral.
+
+## Instalação no homelab (Proxmox + Docker)
+
+Numa VM ou LXC com Docker e Docker Compose:
+
+```bash
+git clone <url-do-repo> discord-bot
+cd discord-bot
+cp .env.example .env
+nano .env          # preenche BOT_TOKEN, BIRTHDAY_CHANNEL_ID, GENERAL_CHANNEL_ID
+docker compose up -d --build
+```
+
+> Num LXC sem privilégios no Proxmox, ativa `nesting=1` (e `keyctl=1`) nas opções do contentor para o Docker funcionar.
+
+### Comandos úteis
+
+```bash
+docker compose logs -f                      # ver logs
+docker compose run --rm bot npm run testar  # mostra a lista lida e quem faz anos hoje, sem enviar nada
+docker compose ps                           # estado do contentor
+git pull && docker compose up -d --build    # atualizar
+```
+
+## Configuração (`.env`)
+
+| Variável | Obrigatória | Por omissão | Descrição |
+|---|---|---|---|
+| `BOT_TOKEN` | sim | | Token do bot |
+| `BIRTHDAY_CHANNEL_ID` | sim | | Canal com a lista de aniversários |
+| `GENERAL_CHANNEL_ID` | sim | | Canal onde são enviados os parabéns |
+| `TIMEZONE` | não | `Europe/Lisbon` | Fuso horário da verificação |
+| `CHECK_TIME` | não | `00:01` | Hora da verificação (HH:MM) |
+| `BIRTHDAY_MESSAGE` | não | `🎉 Hoje é o teu dia, {user}! 🎂 Feliz aniversário!` | `{user}` é substituído pela menção |
+
+## Correr sem Docker
+
+```bash
+npm install
+npm start
+npm run testar
+```

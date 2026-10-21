@@ -1,0 +1,19 @@
+services:
+  bot:
+    build: .
+    image: discord-birthday-bot:latest
+    container_name: discord-birthday-bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: ${TIMEZONE:-Europe/Lisbon}
+    volumes:
+      - bot-data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  bot-data:
