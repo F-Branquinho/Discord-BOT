@@ -3,6 +3,9 @@
 # Voltar a correr este script atualiza o bot para a versão mais recente.
 set -euo pipefail
 
+export LANG=C.UTF-8 LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive
+export NPM_CONFIG_UPDATE_NOTIFIER=false
+
 REPO="https://github.com/F-Branquinho/Discord-BOT.git"
 DIR="/opt/discord-bot"
 UTILIZADOR="discordbot"
@@ -19,8 +22,8 @@ apt-get install -y -qq curl git ca-certificates >/dev/null
 
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 20 ]; then
     echo "📦 Installing Node.js 22..."
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
-    apt-get install -y -qq nodejs >/dev/null
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null 2>&1
+    apt-get install -y -qq nodejs >/dev/null 2>&1
 fi
 echo "✅ Node $(node -v)"
 
@@ -37,7 +40,8 @@ else
 fi
 
 cd "$DIR"
-npm ci --omit=dev --no-audit --no-fund
+echo "📦 Installing npm packages..."
+npm ci --omit=dev --no-audit --no-fund --loglevel=error
 
 mkdir -p "$DIR/data"
 chown "$UTILIZADOR:$UTILIZADOR" "$DIR/data"
@@ -52,7 +56,9 @@ cp "$DIR/deploy/$SERVICO.service" "/etc/systemd/system/$SERVICO.service"
 systemctl daemon-reload
 systemctl enable "$SERVICO" >/dev/null 2>&1
 
-if grep -q '^BOT_TOKEN=.\+' "$DIR/.env"; then
+if [ -n "${SKIP_START:-}" ]; then
+    echo "✅ Bot installed"
+elif grep -q '^BOT_TOKEN=.\+' "$DIR/.env"; then
     systemctl restart "$SERVICO"
     echo
     echo "✅ Bot installed and running. Logs: journalctl -u $SERVICO -f"

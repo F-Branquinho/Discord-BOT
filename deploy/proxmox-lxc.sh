@@ -114,7 +114,10 @@ done
 pct exec "$CTID" -- getent hosts deb.debian.org >/dev/null 2>&1 || erro "Container $CTID has no internet access."
 
 echo "📦 Installing the bot (this may take a few minutes)..."
-pct exec "$CTID" -- bash -c "apt-get update -qq && apt-get install -y -qq curl >/dev/null && curl -fsSL '$INSTALL_URL' | bash"
+# C.UTF-8 existe sempre; o en_US.UTF-8 herdado do Proxmox não está instalado no template.
+# SKIP_START: o .env só é copiado a seguir, por isso o install.sh não deve arrancar o bot.
+pct exec "$CTID" -- env LANG=C.UTF-8 LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive SKIP_START=1 \
+    bash -c "apt-get update -qq && apt-get install -y -qq curl >/dev/null && curl -fsSL '$INSTALL_URL' | bash"
 
 # Escrever o .env sem que o token apareça na linha de comandos
 ENV_TMP="$(mktemp)"
