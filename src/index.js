@@ -19,24 +19,24 @@ async function testar() {
     const lista = await lerAniversarios(client);
     lista.sort((a, b) => a.mes - b.mes || a.dia - b.dia);
 
-    console.log(`\n📋 ${lista.length} aniversários encontrados:`);
+    console.log(`\n📋 ${lista.length} birthdays found:`);
     for (const a of lista) {
         const data = `${String(a.dia).padStart(2, '0')}/${String(a.mes).padStart(2, '0')}`;
         const user = await client.users.fetch(a.userId).catch(() => null);
-        const marca = fazAnosHoje(a, hoje) ? '  ← HOJE' : '';
-        console.log(`  ${data}  ${user?.tag ?? '(desconhecido)'} (${a.userId})${marca}`);
+        const marca = fazAnosHoje(a, hoje) ? '  ← TODAY' : '';
+        console.log(`  ${data}  ${user?.tag ?? '(unknown)'} (${a.userId})${marca}`);
     }
-    console.log(`\nHoje é ${hoje.data} ${hoje.horaMinuto} em ${config.TIMEZONE}`);
+    console.log(`\nNow: ${hoje.data} ${hoje.horaMinuto} in ${config.TIMEZONE}`);
 }
 
 client.once(Events.ClientReady, async () => {
-    console.log(`✅ Bot online como ${client.user.tag}`);
+    console.log(`✅ Bot online as ${client.user.tag}`);
 
     if (MODO_TESTE) {
         try {
             await testar();
         } catch (error) {
-            console.error('❌ Erro no teste:', error);
+            console.error('❌ Test failed:', error);
             process.exitCode = 1;
         }
         await client.destroy();
@@ -46,11 +46,11 @@ client.once(Events.ClientReady, async () => {
     iniciarAgendador(client);
 });
 
-client.on(Events.Error, (error) => console.error('❌ Erro do cliente Discord:', error));
-process.on('unhandledRejection', (error) => console.error('❌ Promise rejeitada sem tratamento:', error));
+client.on(Events.Error, (error) => console.error('❌ Discord client error:', error));
+process.on('unhandledRejection', (error) => console.error('❌ Unhandled promise rejection:', error));
 
 async function encerrar(sinal) {
-    console.log(`👋 ${sinal} recebido, a desligar...`);
+    console.log(`👋 ${sinal} received, shutting down...`);
     await client.destroy();
     process.exit(0);
 }
@@ -58,6 +58,6 @@ process.on('SIGTERM', () => encerrar('SIGTERM'));
 process.on('SIGINT', () => encerrar('SIGINT'));
 
 client.login(config.BOT_TOKEN).catch((error) => {
-    console.error('❌ Falha no login (BOT_TOKEN inválido?):', error.message);
+    console.error('❌ Login failed (invalid BOT_TOKEN?):', error.message);
     process.exit(1);
 });

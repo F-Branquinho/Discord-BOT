@@ -44,15 +44,15 @@ async function executarVerificacao(client) {
     const guardar = (concluido) => guardarEstado({ data: agora.data, enviados: [...enviados], concluido });
 
     try {
-        console.log(`🎂 A verificar aniversários de ${agora.data}...`);
+        console.log(`🎂 Checking birthdays for ${agora.data}...`);
         await verificarAniversarios(client, agora, enviados, (userId) => {
             enviados.add(userId);
             guardar(false);
         });
         guardar(true);
-        console.log('✅ Verificação concluída');
+        console.log('✅ Check complete');
     } catch (error) {
-        console.error(`❌ Erro na verificação, nova tentativa em ${ESPERA_APOS_ERRO_MS / 60000} min:`, error);
+        console.error(`❌ Check failed, retrying in ${ESPERA_APOS_ERRO_MS / 60000} min:`, error);
         setTimeout(() => executarVerificacao(client), ESPERA_APOS_ERRO_MS);
     } finally {
         aCorrer = false;
@@ -68,7 +68,7 @@ async function executarVerificacao(client) {
 function iniciarAgendador(client) {
     const [hora, minuto] = config.CHECK_TIME.split(':').map(Number);
     cron.schedule(`${minuto} ${hora} * * *`, () => executarVerificacao(client), { timezone: config.TIMEZONE });
-    console.log(`⏰ Verificação diária agendada para as ${config.CHECK_TIME} (${config.TIMEZONE})`);
+    console.log(`⏰ Daily check scheduled for ${config.CHECK_TIME} (${config.TIMEZONE})`);
 
     if (agoraNoFuso(config.TIMEZONE).horaMinuto >= config.CHECK_TIME) {
         executarVerificacao(client);

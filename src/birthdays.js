@@ -14,7 +14,7 @@ const MAX_MENSAGENS = 500;
 async function lerAniversarios(client) {
     const canal = await client.channels.fetch(config.BIRTHDAY_CHANNEL_ID);
     if (!canal?.isTextBased()) {
-        throw new Error(`Canal de aniversários ${config.BIRTHDAY_CHANNEL_ID} não encontrado ou não é de texto`);
+        throw new Error(`Birthday channel ${config.BIRTHDAY_CHANNEL_ID} not found or not a text channel`);
     }
 
     const mensagens = [];
@@ -34,7 +34,7 @@ async function lerAniversarios(client) {
             const dia = Number(d);
             const mes = Number(m);
             if (mes < 1 || mes > 12 || dia < 1 || dia > 31) {
-                console.warn(`⚠ Data inválida ignorada: ${d}/${m} - <@${userId}>`);
+                console.warn(`⚠ Ignoring invalid date: ${d}/${m} - <@${userId}>`);
                 continue;
             }
             porUtilizador.set(userId, { userId, dia, mes });
@@ -67,12 +67,12 @@ function fazAnosHoje(aniversario, hoje) {
 async function verificarAniversarios(client, hoje, jaEnviados, aoEnviar) {
     const lista = await lerAniversarios(client);
     const aniversariantes = lista.filter((a) => fazAnosHoje(a, hoje) && !jaEnviados.has(a.userId));
-    console.log(`🔍 ${lista.length} aniversários na lista, ${aniversariantes.length} por felicitar hoje`);
+    console.log(`🔍 ${lista.length} birthdays in the list, ${aniversariantes.length} to celebrate today`);
     if (aniversariantes.length === 0) return;
 
     const canalGeral = await client.channels.fetch(config.GENERAL_CHANNEL_ID);
     if (!canalGeral?.isTextBased()) {
-        throw new Error(`Canal geral ${config.GENERAL_CHANNEL_ID} não encontrado ou não é de texto`);
+        throw new Error(`General channel ${config.GENERAL_CHANNEL_ID} not found or not a text channel`);
     }
 
     for (const { userId } of aniversariantes) {
@@ -80,7 +80,7 @@ async function verificarAniversarios(client, hoje, jaEnviados, aoEnviar) {
             await canalGeral.guild.members.fetch(userId);
         } catch (error) {
             if (error.code === RESTJSONErrorCodes.UnknownMember) {
-                console.warn(`⚠ Utilizador ${userId} já não está no servidor, ignorado`);
+                console.warn(`⚠ User ${userId} is no longer in the server, skipping`);
                 aoEnviar(userId);
                 continue;
             }
@@ -89,7 +89,7 @@ async function verificarAniversarios(client, hoje, jaEnviados, aoEnviar) {
 
         const conteudo = config.BIRTHDAY_MESSAGE.replaceAll('{user}', `<@${userId}>`);
         await canalGeral.send({ content: conteudo, allowedMentions: { users: [userId] } });
-        console.log(`📢 Parabéns enviados a ${userId}`);
+        console.log(`📢 Birthday message sent to ${userId}`);
         aoEnviar(userId);
     }
 }

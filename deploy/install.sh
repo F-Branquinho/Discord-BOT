@@ -9,16 +9,16 @@ UTILIZADOR="discordbot"
 SERVICO="discord-bot"
 
 if [ "$(id -u)" -ne 0 ]; then
-    echo "❌ Corre este script como root." >&2
+    echo "❌ Run this script as root." >&2
     exit 1
 fi
 
-echo "📦 A instalar dependências do sistema..."
+echo "📦 Installing system dependencies..."
 apt-get update -qq
 apt-get install -y -qq curl git ca-certificates >/dev/null
 
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 20 ]; then
-    echo "📦 A instalar Node.js 22..."
+    echo "📦 Installing Node.js 22..."
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
     apt-get install -y -qq nodejs >/dev/null
 fi
@@ -29,10 +29,10 @@ if ! id "$UTILIZADOR" >/dev/null 2>&1; then
 fi
 
 if [ -d "$DIR/.git" ]; then
-    echo "🔄 A atualizar o código..."
+    echo "🔄 Updating code..."
     git -C "$DIR" pull --ff-only
 else
-    echo "⬇ A descarregar o código..."
+    echo "⬇ Downloading code..."
     git clone "$REPO" "$DIR"
 fi
 
@@ -55,11 +55,11 @@ systemctl enable "$SERVICO" >/dev/null 2>&1
 if grep -q '^BOT_TOKEN=.\+' "$DIR/.env"; then
     systemctl restart "$SERVICO"
     echo
-    echo "✅ Bot instalado e a correr. Logs: journalctl -u $SERVICO -f"
+    echo "✅ Bot installed and running. Logs: journalctl -u $SERVICO -f"
 else
     echo
-    echo "⚠ Falta configurar o bot:"
-    echo "   1. nano $DIR/.env   (preenche BOT_TOKEN, BIRTHDAY_CHANNEL_ID, GENERAL_CHANNEL_ID)"
+    echo "⚠ The bot still needs to be configured:"
+    echo "   1. nano $DIR/.env   (fill in BOT_TOKEN, BIRTHDAY_CHANNEL_ID, GENERAL_CHANNEL_ID)"
     echo "   2. systemctl restart $SERVICO"
     echo "   3. journalctl -u $SERVICO -f"
 fi

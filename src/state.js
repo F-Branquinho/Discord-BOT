@@ -13,7 +13,7 @@ function lerEstado() {
     try {
         return JSON.parse(fs.readFileSync(FICHEIRO_ESTADO, 'utf8'));
     } catch (error) {
-        if (error.code !== 'ENOENT') console.warn('⚠ Estado ilegível, a começar do zero:', error.message);
+        if (error.code !== 'ENOENT') console.warn('⚠ Unreadable state file, starting fresh:', error.message);
         return { data: null, enviados: [], concluido: false };
     }
 }

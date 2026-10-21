@@ -4,7 +4,7 @@ require('dotenv').config();
 function obrigatoria(nome) {
     const valor = process.env[nome]?.trim();
     if (!valor) {
-        console.error(`❌ Variável de ambiente em falta: ${nome}`);
+        console.error(`❌ Missing environment variable: ${nome}`);
         process.exit(1);
     }
     return valor;
@@ -21,14 +21,14 @@ const config = {
 };
 
 if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(config.CHECK_TIME)) {
-    console.error(`❌ CHECK_TIME inválido: "${config.CHECK_TIME}" (formato HH:MM, ex: 00:01)`);
+    console.error(`❌ Invalid CHECK_TIME: "${config.CHECK_TIME}" (format HH:MM, e.g. 00:01)`);
     process.exit(1);
 }
 
 try {
     new Intl.DateTimeFormat('en-GB', { timeZone: config.TIMEZONE });
 } catch {
-    console.error(`❌ TIMEZONE inválido: "${config.TIMEZONE}" (ex: Europe/Lisbon)`);
+    console.error(`❌ Invalid TIMEZONE: "${config.TIMEZONE}" (e.g. Europe/Lisbon)`);
     process.exit(1);
 }
 
