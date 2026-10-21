@@ -15,7 +15,7 @@ STORAGE="${STORAGE:-$(pvesm status -content rootdir | awk 'NR>1 && $3=="active" 
 TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-$(pvesm status -content vztmpl | awk 'NR>1 && $3=="active" {print $1; exit}')}"
 BRIDGE="${BRIDGE:-vmbr0}"
 CORES="${CORES:-1}"
-MEMORY="${MEMORY:-512}"
+MEMORY="${MEMORY:-256}"
 DISK="${DISK:-4}"
 
 erro() { echo "❌ $*" >&2; exit 1; }

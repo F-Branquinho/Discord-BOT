@@ -28,7 +28,7 @@ Na **Shell do nó Proxmox** (interface web → nó → Shell):
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/proxmox-lxc.sh)"
 ```
 
-O script pede o token e os IDs dos canais, cria um LXC Debian 12 (1 core, 512 MB, 4 GB, DHCP, arranca com o Proxmox), instala o bot e deixa-o a correr.
+O script pede o token e os IDs dos canais, cria um LXC Debian 12 (1 core, 256 MB, 4 GB, DHCP, arranca com o Proxmox), instala o bot e deixa-o a correr.
 Para mudar os recursos: `CTID=150 MEMORY=1024 STORAGE=local-zfs bash -c "$(curl ...)"`.
 
 ```bash
@@ -40,7 +40,7 @@ pct exec <CTID> -- nano /opt/discord-bot/.env                # mudar configuraç
 ## Instalação manual num LXC
 
 1. No Proxmox: **local → CT Templates → Templates**, descarrega `debian-12-standard`.
-2. **Create CT**: unprivileged, 1 core, 512 MB RAM, 4 GB disco, rede DHCP. Em **Options**, ativa **Start at boot**.
+2. **Create CT**: unprivileged, 1 core, 256 MB RAM, 4 GB disco, rede DHCP. Em **Options**, ativa **Start at boot**.
 3. Na consola do LXC, como root:
    ```bash
    apt update && apt install -y curl
