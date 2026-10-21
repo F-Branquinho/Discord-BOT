@@ -20,6 +20,42 @@ DISK="${DISK:-4}"
 
 erro() { echo "❌ $*" >&2; exit 1; }
 
+# Tira espaços e \r (colagens vindas do Windows)
+limpar() {
+    local v="${1//$'\r'/}"
+    v="${v#"${v%%[![:space:]]*}"}"
+    printf '%s' "${v%"${v##*[![:space:]]}"}"
+}
+
+valido_token() { [[ "$1" =~ ^[A-Za-z0-9._-]{50,}$ ]]; }
+valido_id() { [[ "$1" =~ ^[0-9]{17,20}$ ]]; }
+valido_tz() { [ -n "$1" ] && [ -f "/usr/share/zoneinfo/$1" ]; }
+valido_hora() { [[ "$1" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; }
+
+# perguntar VARIAVEL "texto" validador [omissão] [secreto]
+# Usa a variável de ambiente se já estiver definida e for válida; senão pergunta até ser válida.
+perguntar() {
+    local var="$1" texto="$2" validar="$3" omissao="${4:-}" secreto="${5:-}" valor
+    valor="$(limpar "${!var:-}")"
+    until "$validar" "$valor"; do
+        if [ -n "$valor" ]; then
+            if [ -n "$secreto" ]; then echo "⚠ Valor inválido, tenta outra vez." >&2
+            else echo "⚠ \"$valor\" não é válido, tenta outra vez." >&2; fi
+        fi
+        # Descartar linhas a mais que tenham sido coladas
+        while read -r -t 0.1 _; do :; done
+        if [ -n "$secreto" ]; then
+            read -rsp "$texto: " valor || erro "Entrada terminada."
+            echo
+        else
+            read -rp "$texto${omissao:+ [$omissao]}: " valor || erro "Entrada terminada."
+        fi
+        valor="$(limpar "$valor")"
+        valor="${valor:-$omissao}"
+    done
+    printf -v "$var" '%s' "$valor"
+}
+
 command -v pct >/dev/null || erro "Este script corre na shell do Proxmox (pct não encontrado)."
 [ "$(id -u)" -eq 0 ] || erro "Corre como root."
 [ -n "$STORAGE" ] || erro "Nenhum storage para contentores encontrado (define STORAGE=...)."
@@ -29,16 +65,16 @@ echo "🎂 Discord Birthday Bot: instalação em LXC"
 echo
 
 # Pedir configuração antes de criar o que quer que seja
-[ -n "${BOT_TOKEN:-}" ] || { read -rsp "BOT_TOKEN: " BOT_TOKEN; echo; }
-[ -n "${BIRTHDAY_CHANNEL_ID:-}" ] || read -rp "ID do canal de aniversários: " BIRTHDAY_CHANNEL_ID
-[ -n "${GENERAL_CHANNEL_ID:-}" ] || read -rp "ID do canal onde enviar os parabéns: " GENERAL_CHANNEL_ID
-[ -n "${TIMEZONE:-}" ] || { read -rp "Fuso horário [Europe/Lisbon]: " TIMEZONE; TIMEZONE="${TIMEZONE:-Europe/Lisbon}"; }
-[ -n "${CHECK_TIME:-}" ] || { read -rp "Hora da verificação diária [00:01]: " CHECK_TIME; CHECK_TIME="${CHECK_TIME:-00:01}"; }
-
-[ -n "$BOT_TOKEN" ] && [ -n "$BIRTHDAY_CHANNEL_ID" ] && [ -n "$GENERAL_CHANNEL_ID" ] \
-    || erro "BOT_TOKEN e IDs dos canais são obrigatórios."
+perguntar BOT_TOKEN "BOT_TOKEN (não aparece ao escrever)" valido_token "" secreto
+perguntar BIRTHDAY_CHANNEL_ID "ID do canal de aniversários" valido_id
+perguntar GENERAL_CHANNEL_ID "ID do canal onde enviar os parabéns" valido_id
+perguntar TIMEZONE "Fuso horário" valido_tz "Europe/Lisbon"
+perguntar CHECK_TIME "Hora da verificação diária (HH:MM)" valido_hora "00:01"
 
 echo
+echo "Canal de aniversários: $BIRTHDAY_CHANNEL_ID"
+echo "Canal dos parabéns:    $GENERAL_CHANNEL_ID"
+echo "Verificação diária:    $CHECK_TIME ($TIMEZONE)"
 echo "CT $CTID ($CT_HOSTNAME): $CORES core, ${MEMORY} MB RAM, ${DISK} GB em $STORAGE, rede $BRIDGE (DHCP)"
 read -rp "Continuar? [S/n] " CONFIRMAR
 [[ "${CONFIRMAR:-S}" =~ ^[SsYy]$ ]] || erro "Cancelado."
