@@ -131,7 +131,7 @@ function paginaServidores({ sessao, servidores }) {
         }
         return `<div class="cartao servidor">
   ${iconeServidor(s.id, s.nome, s.icon)}
-  <div class="nome">${esc(s.nome)}<br>${estado}</div>
+  <div class="nome">${esc(s.nome)}<br>${estado}${s.comoDono ? ' <span class="etiqueta suave">· as bot owner</span>' : ''}</div>
   ${acao}
 </div>`;
     }).join('');
@@ -140,7 +140,7 @@ function paginaServidores({ sessao, servidores }) {
     return layout('Your servers', `
 ${cabecalho(sessao)}
 <h1>Your servers</h1>
-<p class="suave">Servers where you have the Manage Server permission. After adding the bot to a server, <a href="/login">refresh the list</a>.</p>
+<p class="suave">Servers where you have the Manage Server permission${sessao.dono ? ', plus every server the bot is in (you own the bot)' : ''}. After adding the bot to a server, <a href="/login">refresh the list</a>.</p>
 ${servidores.length ? itens : vazio}`);
 }
 

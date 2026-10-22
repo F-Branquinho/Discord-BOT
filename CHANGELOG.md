@@ -2,6 +2,11 @@
 
 Each version is a GitHub tag. To install a specific version, see [Versions](README.md#versions) in the README.
 
+## v3.2.0
+
+- The owner of the bot application sees and can set up every server the bot is in, even without Manage Server there (whoever holds the bot token already controls the bot in those servers).
+- The Proxmox installer accepts a static IP (`IP`, `GATEWAY`), shows the gateway in the summary and checks it before creating the container.
+
 ## v3.1.0
 
 - **Setup page**: the bot token, OAuth2 client secret and public address are set in the browser at `/setup`, protected by a one-time setup code shown by the installer and in the logs. Everything is checked with Discord before it is saved.

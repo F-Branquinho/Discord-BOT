@@ -1,6 +1,6 @@
 {
   "name": "discord-birthday-bot",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": true,
   "description": "Discord bot that wishes members a happy birthday, with a web panel to set up each server",
   "main": "src/index.js",

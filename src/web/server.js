@@ -110,11 +110,14 @@ async function segredoValido(applicationId, segredo) {
 /**
  * Returns the server if the user has Manage Server there. The bot checks the permission on
  * every request, not just at login, so removing someone's permission takes effect right away.
+ * The owner of the bot application can manage every server the bot is in: whoever holds
+ * the bot token already controls the bot there.
  */
-async function servidorGerivel(client, guildId, userId) {
+async function servidorGerivel(client, guildId, sessao) {
     const guild = client.guilds.cache.get(guildId);
     if (!guild) return null;
-    const membro = await guild.members.fetch(userId).catch(() => null);
+    if (sessao.dono) return guild;
+    const membro = await guild.members.fetch(sessao.userId).catch(() => null);
     return membro?.permissions.has(ManageGuild) ? guild : null;
 }
 
@@ -320,7 +323,15 @@ function iniciarPainel(bot) {
         const sessao = obterSessao(req);
         if (!sessao) return res.send(views.paginaInicial({ bot: cliente().user }));
 
-        const servidores = sessao.guilds
+        const lista = [...sessao.guilds];
+        if (sessao.dono) {
+            // The bot owner also sees every server the bot is in
+            const ids = new Set(lista.map((g) => g.id));
+            for (const guild of cliente().guilds.cache.values()) {
+                if (!ids.has(guild.id)) lista.push({ id: guild.id, nome: guild.name, icon: guild.icon, comoDono: true });
+            }
+        }
+        const servidores = lista
             .map((g) => ({
                 ...g,
                 temBot: cliente().guilds.cache.has(g.id),
@@ -480,7 +491,7 @@ function iniciarPainel(bot) {
 
     app.get('/server/:id', exigirSessao, async (req, res, next) => {
         try {
-            const guild = await servidorGerivel(cliente(), req.params.id, req.sessao.userId);
+            const guild = await servidorGerivel(cliente(), req.params.id, req.sessao);
             if (!guild) return negar(req, res);
             res.send(await renderServidor(cliente(), guild, req.sessao, { guardado: req.query.saved === '1' }));
         } catch (error) {
@@ -490,7 +501,7 @@ function iniciarPainel(bot) {
 
     app.post('/server/:id', exigirSessao, exigirCsrf, async (req, res, next) => {
         try {
-            const guild = await servidorGerivel(cliente(), req.params.id, req.sessao.userId);
+            const guild = await servidorGerivel(cliente(), req.params.id, req.sessao);
             if (!guild) return negar(req, res);
 
             const cfg = {
