@@ -45,6 +45,14 @@ if [ "$IP" != "dhcp" ]; then
     [[ "$GATEWAY" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || erro "A static IP also needs GATEWAY (e.g. GATEWAY=192.0.2.1)"
 fi
 REDE="name=eth0,bridge=$BRIDGE,ip=$IP${GATEWAY:+,gw=$GATEWAY}"
+if [ "$IP" != "dhcp" ]; then
+    # A wrong gateway leaves the container without internet, so catch it before creating anything
+    ping -c 1 -W 2 "$GATEWAY" >/dev/null 2>&1 \
+        || erro "Gateway $GATEWAY doesn't answer. Check it in Proxmox → node → System → Network (vmbr0)."
+    if ping -c 1 -W 1 "${IP%/*}" >/dev/null 2>&1; then
+        erro "${IP%/*} is already in use by another device. Choose a free IP."
+    fi
+fi
 case "$VERSION" in
     v1.* | v2.* | v3.0.*)
         erro "Version $VERSION has no setup page. Use v3.1.0 or later, or install it with deploy/install.sh and fill in its .env." ;;
@@ -68,7 +76,8 @@ if [ -n "$TUNEL" ] && ! [[ "$TUNEL" =~ ^[A-Za-z0-9_=-]{50,}$ ]]; then
 fi
 
 echo
-echo "CT $CTID ($CT_HOSTNAME): $CORES core, ${MEMORY} MB RAM, ${DISK} GB on $STORAGE, network $BRIDGE ($IP)"
+echo "CT $CTID ($CT_HOSTNAME): $CORES core, ${MEMORY} MB RAM, ${DISK} GB on $STORAGE"
+echo "Network: $BRIDGE, IP $IP${GATEWAY:+, gateway $GATEWAY}"
 echo "Version: $VERSION. Cloudflare Tunnel: $([ -n "$TUNEL" ] && echo yes || echo no)"
 read -rp "Continue? [Y/n] " CONFIRMAR
 [[ "${CONFIRMAR:-Y}" =~ ^[YySs]$ ]] || erro "Cancelled."
@@ -105,7 +114,8 @@ for _ in $(seq 1 30); do
     pct exec "$CTID" -- getent hosts deb.debian.org >/dev/null 2>&1 && break
     sleep 2
 done
-pct exec "$CTID" -- getent hosts deb.debian.org >/dev/null 2>&1 || erro "Container $CTID has no internet access."
+pct exec "$CTID" -- getent hosts deb.debian.org >/dev/null 2>&1 \
+    || erro "Container $CTID has no internet access. Check its network (IP/gateway), then remove it with: pct stop $CTID; pct destroy $CTID"
 
 echo "📦 Installing the bot (this may take a few minutes)..."
 # C.UTF-8 always exists; the en_US.UTF-8 inherited from Proxmox is not installed in the template
