@@ -65,22 +65,32 @@ async function obterCanalGeral(client) {
     return canal;
 }
 
+function formatarData(dia, mes) {
+    return `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`;
+}
+
+/** "Novembro", "Março", ... */
+function nomeDoMes(mes) {
+    const nome = new Intl.DateTimeFormat('pt-PT', { month: 'long', timeZone: 'UTC' })
+        .format(new Date(Date.UTC(2000, mes - 1, 1)));
+    return nome[0].toUpperCase() + nome.slice(1);
+}
+
+function aniversariosDoMes(lista, mes) {
+    return lista.filter((a) => a.mes === mes).sort((a, b) => a.dia - b.dia);
+}
+
 /**
  * Texto do resumo mensal, ou null se ninguém fizer anos nesse mês.
  * @param {{ userId: string, dia: number, mes: number }[]} lista
- * @param {{ mes: number, ano: number }} hoje
+ * @param {{ mes: number }} hoje
  */
 function mensagemResumoMensal(lista, hoje) {
-    const doMes = lista.filter((a) => a.mes === hoje.mes).sort((a, b) => a.dia - b.dia);
+    const doMes = aniversariosDoMes(lista, hoje.mes);
     if (doMes.length === 0) return null;
 
-    const nomeMes = new Intl.DateTimeFormat('pt-PT', { month: 'long', timeZone: 'UTC' })
-        .format(new Date(Date.UTC(hoje.ano, hoje.mes - 1, 1)));
-    const linhas = doMes.map((a) => {
-        const data = `${String(a.dia).padStart(2, '0')}/${String(a.mes).padStart(2, '0')}`;
-        return `• ${data} - <@${a.userId}>`;
-    });
-    return `📅 **Aniversários de ${nomeMes[0].toUpperCase()}${nomeMes.slice(1)}**\n${linhas.join('\n')}`;
+    const linhas = doMes.map((a) => `• ${formatarData(a.dia, a.mes)} - <@${a.userId}>`);
+    return `📅 **Aniversários de ${nomeDoMes(hoje.mes)}**\n${linhas.join('\n')}`;
 }
 
 /**
@@ -135,6 +145,9 @@ async function verificarAniversarios(client, lista, hoje, jaEnviados, aoEnviar) 
 module.exports = {
     lerAniversarios,
     fazAnosHoje,
+    formatarData,
+    nomeDoMes,
+    aniversariosDoMes,
     mensagemResumoMensal,
     enviarResumoMensal,
     verificarAniversarios,

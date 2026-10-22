@@ -16,10 +16,21 @@ Bot de Discord que lê a lista de aniversários de um canal e dá os parabéns n
 - Quem nasceu a 29/02 recebe os parabéns a 28/02 nos anos não bissextos.
 - Se a verificação falhar (por exemplo, o Discord está em baixo), volta a tentar de 5 em 5 minutos.
 
+## Comandos
+
+| Comando | O que faz |
+|---|---|
+| `/aniversario-adicionar data:25/12` | Adiciona ou altera o teu aniversário. Com `utilizador:`, adiciona o de outra pessoa (precisa de **Gerir servidor**). O bot escreve a linha no canal de aniversários. |
+| `/aniversario-status` | Mostra se o bot está a correr, há quanto tempo, a última e a próxima verificação. |
+| `/aniversarios-proximos` | Lista os aniversários deste mês (os que já passaram aparecem riscados). |
+
+Nenhum comando notifica as pessoas listadas.
+
 ## Requisitos no Discord
 
 No [Developer Portal](https://discord.com/developers/applications) → Bot, ativa **Message Content Intent**.
-O bot precisa de **Ver canal** e **Ler histórico de mensagens** no canal de aniversários, e de **Enviar mensagens** no canal geral.
+O bot precisa de **Ver canal**, **Ler histórico de mensagens** e **Enviar mensagens** no canal de aniversários (para o `/aniversario-adicionar`), e de **Enviar mensagens** no canal geral.
+Se os comandos não aparecerem, os logs mostram um link para voltar a convidar o bot com o scope `applications.commands`.
 
 ## Instalação no Proxmox com um comando (recomendado)
 

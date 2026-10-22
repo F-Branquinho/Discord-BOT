@@ -2,6 +2,7 @@ const { Client, Events, GatewayIntentBits } = require('discord.js');
 const config = require('./config');
 const { lerAniversarios, fazAnosHoje, mensagemResumoMensal } = require('./birthdays');
 const { agoraNoFuso, iniciarAgendador } = require('./scheduler');
+const { registarComandos, tratarInteracao } = require('./commands');
 
 // --testar: mostra a lista lida do canal e quem faz anos hoje, sem enviar nada
 const MODO_TESTE = process.argv.includes('--testar');
@@ -48,8 +49,10 @@ client.once(Events.ClientReady, async () => {
     }
 
     iniciarAgendador(client);
+    registarComandos(client).catch((error) => console.error('❌ Failed to register slash commands:', error));
 });
 
+client.on(Events.InteractionCreate, tratarInteracao);
 client.on(Events.Error, (error) => console.error('❌ Discord client error:', error));
 process.on('unhandledRejection', (error) => console.error('❌ Unhandled promise rejection:', error));
 
