@@ -1,3 +1,5 @@
+<img src="assets/icon.png" alt="" width="96" align="right">
+
 # Discord Birthday Bot
 
 A Discord bot that wishes members a happy birthday on their day, across multiple servers, with a web panel to set up the bot and each server. It runs 24/7 in a Proxmox LXC (or Docker) and is published to the internet through a Cloudflare Tunnel.

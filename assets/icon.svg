@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff7ad9"/>
+      <stop offset="1" stop-color="#6d5bff"/>
+    </linearGradient>
+    <radialGradient id="brilho" cx="0.5" cy="0.32" r="0.55">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="chama" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff6a8"/>
+      <stop offset="1" stop-color="#ff9a1f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background (Discord crops it to a circle, so everything important stays in the middle) -->
+  <rect width="512" height="512" fill="url(#fundo)"/>
+  <rect width="512" height="512" fill="url(#brilho)"/>
+
+  <!-- Confetti -->
+  <g opacity="0.9">
+    <rect x="118" y="132" width="16" height="7" rx="3.5" fill="#fff36b" transform="rotate(-30 126 135)"/>
+    <rect x="380" y="150" width="16" height="7" rx="3.5" fill="#7df9ff" transform="rotate(35 388 153)"/>
+    <rect x="96" y="250" width="14" height="6" rx="3" fill="#ffffff" transform="rotate(20 103 253)"/>
+    <rect x="404" y="262" width="14" height="6" rx="3" fill="#fff36b" transform="rotate(-25 411 265)"/>
+    <circle cx="160" cy="196" r="6" fill="#7df9ff"/>
+    <circle cx="356" cy="208" r="6" fill="#ffffff"/>
+    <circle cx="330" cy="118" r="5" fill="#fff36b"/>
+    <circle cx="184" cy="110" r="4.5" fill="#ffffff"/>
+  </g>
+
+  <!-- Plate -->
+  <ellipse cx="256" cy="414" rx="150" ry="20" fill="#3b2a8f" opacity="0.35"/>
+  <ellipse cx="256" cy="406" rx="140" ry="16" fill="#ffffff"/>
+
+  <!-- Bottom tier -->
+  <rect x="136" y="298" width="240" height="108" rx="20" fill="#ffffff"/>
+  <path d="M136 318 a20 20 0 0 1 20 -20 h200 a20 20 0 0 1 20 20 v14
+           c-12 0 -12 18 -24 18 s-12 -18 -24 -18 s-12 26 -24 26 s-12 -26 -24 -26 s-12 18 -24 18
+           s-12 -18 -24 -18 s-12 24 -24 24 s-12 -24 -24 -24 s-12 18 -24 18 s-12 -18 -24 -18 z" fill="#ff4fae"/>
+  <circle cx="176" cy="372" r="7" fill="#ffd1ec"/>
+  <circle cx="226" cy="384" r="7" fill="#c9c2ff"/>
+  <circle cx="286" cy="372" r="7" fill="#ffd1ec"/>
+  <circle cx="336" cy="384" r="7" fill="#c9c2ff"/>
+
+  <!-- Top tier -->
+  <rect x="176" y="226" width="160" height="80" rx="16" fill="#ffffff"/>
+  <path d="M176 242 a16 16 0 0 1 16 -16 h128 a16 16 0 0 1 16 16 v10
+           c-10 0 -10 14 -20 14 s-10 -14 -20 -14 s-10 20 -20 20 s-10 -20 -20 -20 s-10 14 -20 14
+           s-10 -14 -20 -14 s-10 18 -20 18 s-10 -18 -16 -18 z" fill="#8b6bff"/>
+
+  <!-- Candle -->
+  <rect x="244" y="154" width="24" height="76" rx="6" fill="#ffffff"/>
+  <path d="M244 172 l24 -12 v14 l-24 12 z M244 196 l24 -12 v14 l-24 12 z M244 220 l24 -12 v10 l-24 10 z" fill="#ff4fae"/>
+
+  <!-- Flame -->
+  <path d="M256 92 c18 22 26 36 26 50 a26 26 0 0 1 -52 0 c0 -14 8 -28 26 -50 z" fill="url(#chama)"/>
+  <path d="M256 118 c8 10 12 17 12 23 a12 12 0 0 1 -24 0 c0 -6 4 -13 12 -23 z" fill="#ffffff" opacity="0.85"/>
+</svg>
