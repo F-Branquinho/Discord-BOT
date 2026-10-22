@@ -46,11 +46,9 @@ No command pings the people on the list.
 
 **Cloudflare** ([Zero Trust](https://one.dash.cloudflare.com/) → **Networks** → **Tunnels**):
 
-1. **Create a tunnel** → **Cloudflared** → give it a name (e.g. `homelab`).
+1. **Create a tunnel** → **Cloudflared** → give it a name (e.g. `discord-bot`).
 2. Copy the **token** from the install command (the long part after `cloudflared service install`).
 3. **Public hostname**: subdomain `bot`, your domain, service **HTTP** → `localhost:3000`.
-
-The same tunnel can publish other homelab services: just add more public hostnames (e.g. `jellyfin.yourdomain.com` → `http://192.168.1.50:8096`).
 
 ## One-command install on Proxmox (recommended)
 

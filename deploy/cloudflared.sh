@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs Cloudflare Tunnel (cloudflared) as a systemd service. Run as root,
-# in the bot's LXC or in an LXC just for the tunnel (which can serve other homelab services too).
+# in the bot's LXC or in a separate LXC just for the tunnel.
 #
 # The token comes from Cloudflare Zero Trust: Networks → Tunnels → Create a tunnel → Cloudflared.
 # It can be passed in CLOUDFLARE_TUNNEL_TOKEN; otherwise it is asked for. The whole
