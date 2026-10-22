@@ -90,6 +90,23 @@ systemctl enable "$SERVICO" >/dev/null 2>&1
 
 if [ -n "${SKIP_START:-}" ]; then
     echo "✅ Bot installed"
+elif [ -f "$DIR/src/settings.js" ]; then
+    # v3.1.0 and later start without a token and are set up in the browser
+    systemctl restart "$SERVICO"
+    CODIGO=""
+    for _ in $(seq 1 15); do
+        CODIGO="$(cat "$DIR/data/setup-code" 2>/dev/null || true)"
+        [ -n "$CODIGO" ] && break
+        sleep 1
+    done
+    echo
+    echo "✅ Bot installed and running. Logs: journalctl -u $SERVICO -f"
+    if [ -n "$CODIGO" ] && [ -z "${QUIET_SETUP:-}" ]; then
+        echo
+        echo "👉 Finish the setup in your browser:"
+        echo "   http://$(hostname -I | awk '{print $1}'):3000/setup"
+        echo "   Setup code: $CODIGO"
+    fi
 elif grep -q '^BOT_TOKEN=.\+' "$DIR/.env"; then
     systemctl restart "$SERVICO"
     echo

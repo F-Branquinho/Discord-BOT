@@ -74,7 +74,9 @@ async function verificarServidor(client, guildId, cfg) {
  * Checks every server that has passed its check time and hasn't been checked today.
  * This also catches up on today if the bot was down at the scheduled time.
  */
-function tick(client) {
+function tick(obterCliente) {
+    const client = obterCliente();
+    if (!client?.isReady()) return;
     for (const [guildId, cfg] of store.servidoresConfigurados()) {
         if (!cfg.enabled || !client.guilds.cache.has(guildId) || aCorrer.has(guildId)) continue;
         if (Date.now() < (proximaTentativa.get(guildId) ?? 0)) continue;
@@ -91,12 +93,16 @@ function tick(client) {
 /**
  * Each server has its own time and timezone, so cron runs every minute
  * and the tick decides which servers are due.
- * @param {import('discord.js').Client} client
+ * @param {() => import('discord.js').Client | null} obterCliente - the current client changes when the token changes
  */
-function iniciarAgendador(client) {
-    cron.schedule('* * * * *', () => tick(client));
+function iniciarAgendador(obterCliente) {
+    cron.schedule('* * * * *', () => tick(obterCliente));
     console.log(`⏰ Scheduler started (${store.servidoresConfigurados().length} configured servers)`);
-    tick(client);
+}
+
+/** Runs a tick right away, e.g. when the bot connects after being down. */
+function verificarAgora(obterCliente) {
+    tick(obterCliente);
 }
 
 /** When a server's next check happens, for /birthday-status and the panel. */
@@ -116,4 +122,4 @@ function ultimaVerificacao(guildId) {
     return `${estado.data.split('-').reverse().join('/')} ${estado.concluido ? '✅' : '⚠ incomplete'}`;
 }
 
-module.exports = { agoraNoFuso, iniciarAgendador, proximaVerificacao, ultimaVerificacao };
+module.exports = { agoraNoFuso, iniciarAgendador, verificarAgora, proximaVerificacao, ultimaVerificacao };

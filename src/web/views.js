@@ -91,10 +91,13 @@ function cabecalho(sessao) {
     <img class="avatar" src="${avatarUtilizador(sessao.userId, sessao.avatar)}" alt="">
     <span>${esc(sessao.nome)}</span>
   </div>
-  <form method="post" action="/logout">
-    <input type="hidden" name="csrf" value="${esc(sessao.csrf)}">
-    <button class="botao secundario" type="submit">Log out</button>
-  </form>
+  <div class="quem">
+    ${sessao.dono ? '<a class="botao secundario" href="/settings">Bot settings</a>' : ''}
+    <form method="post" action="/logout">
+      <input type="hidden" name="csrf" value="${esc(sessao.csrf)}">
+      <button class="botao secundario" type="submit">Log out</button>
+    </form>
+  </div>
 </header>`;
 }
 
@@ -221,6 +224,76 @@ ${cartaoResumo}
 </form>`);
 }
 
+function paginaSetup({ campos, publicUrl, recuperacao, botLigado, erros }) {
+    const introducao = recuperacao
+        ? '<p>The saved bot token stopped working. Paste a new one to get the bot back online.</p>'
+        : '<p>Connect the bot to your Discord application. Everything is checked with Discord before it is saved.</p>';
+    return layout('Bot setup', `
+<h1>Bot setup</h1>
+${introducao}
+${botLigado ? alertas('ok', ['The bot is already connected (token from .env). Finish the panel setup below.']) : ''}
+${alertas('erro', erros)}
+<form class="cartao" method="post" action="/setup" autocomplete="off">
+  <label for="code">Setup code</label>
+  <input id="code" name="code" type="text" required placeholder="ABCD-EFGH" spellcheck="false">
+  <div class="ajuda">Shown by the installer and in the bot's logs: <code>journalctl -u discord-bot</code>. It keeps strangers from setting up your bot first.</div>
+${campos.botToken ? `
+  <label for="botToken">Bot token</label>
+  <input id="botToken" name="botToken" type="password" required spellcheck="false">
+  <div class="ajuda"><a href="https://discord.com/developers/applications" target="_blank" rel="noopener">Developer Portal</a> → your application → <strong>Bot</strong> → <strong>Reset Token</strong>. On the same page, turn on <strong>Message Content Intent</strong>.</div>` : ''}
+${campos.clientSecret ? `
+  <label for="clientSecret">OAuth2 client secret</label>
+  <input id="clientSecret" name="clientSecret" type="password" required spellcheck="false">
+  <div class="ajuda">Developer Portal → your application → <strong>OAuth2</strong> → <strong>Client Secret</strong>. Used for "Log in with Discord".</div>` : ''}
+${campos.publicUrl ? `
+  <label for="publicUrl">Public address of this panel</label>
+  <input id="publicUrl" name="publicUrl" type="text" required placeholder="https://bot.example.com" value="${esc(publicUrl)}" spellcheck="false">
+  <div class="ajuda">The address your Cloudflare Tunnel points at this bot, without a trailing <code>/</code>.</div>` : ''}
+
+  <p style="margin-top:20px"><button class="botao" type="submit">Connect</button></p>
+</form>`);
+}
+
+function paginaSetupConcluido({ nome, publicUrl, redirect, convite }) {
+    return layout('Setup complete', `
+<h1>✅ ${esc(nome)} is online</h1>
+<div class="cartao">
+  <h2>Last steps</h2>
+  <ol class="lista">
+    <li>In Developer Portal → <strong>OAuth2</strong> → <strong>Redirects</strong>, add:<br><code>${esc(redirect)}</code></li>
+    <li>Add the bot to your server: <a href="${esc(convite)}" target="_blank" rel="noopener">invite link</a>.</li>
+    <li>Open <a href="${esc(publicUrl)}">${esc(publicUrl)}</a>, log in with Discord and set up each server.</li>
+  </ol>
+</div>`);
+}
+
+function paginaDefinicoes({ sessao, origens, publicUrl, botNome, erros, guardado }) {
+    const doEnv = '<div class="ajuda">Set in <code>.env</code>, so it can only be changed there.</div>';
+    return layout('Bot settings', `
+${cabecalho(sessao)}
+<p><a href="/">← Your servers</a></p>
+<h1>Bot settings</h1>
+<p class="suave">Connected as ${esc(botNome)}. Only the owner of the Discord application sees this page.</p>
+${guardado ? alertas('ok', ['Settings saved.']) : ''}
+${alertas('erro', erros)}
+<form class="cartao" method="post" action="/settings" autocomplete="off">
+  <input type="hidden" name="csrf" value="${esc(sessao.csrf)}">
+
+  <label for="botToken">New bot token</label>
+  ${origens.botToken === 'env' ? doEnv : `<input id="botToken" name="botToken" type="password" placeholder="Leave empty to keep the current one" spellcheck="false">
+  <div class="ajuda">The bot reconnects with the new token; if it doesn't work, the current one stays.</div>`}
+
+  <label for="clientSecret">New OAuth2 client secret</label>
+  ${origens.clientSecret === 'env' ? doEnv : '<input id="clientSecret" name="clientSecret" type="password" placeholder="Leave empty to keep the current one" spellcheck="false">'}
+
+  <label for="publicUrl">Public address of this panel</label>
+  ${origens.publicUrl === 'env' ? `<p><code>${esc(publicUrl)}</code></p>${doEnv}` : `<input id="publicUrl" name="publicUrl" type="text" required value="${esc(publicUrl)}" spellcheck="false">
+  <div class="ajuda">If you change it, also update the redirect in Developer Portal → OAuth2 → Redirects (<code>&lt;address&gt;/callback</code>).</div>`}
+
+  <p style="margin-top:20px"><button class="botao" type="submit">Save</button></p>
+</form>`);
+}
+
 function paginaErro(mensagem, { estado = 'Error', link = '/' } = {}) {
     return layout(estado, `
 <div class="cartao centro">
@@ -230,4 +303,13 @@ function paginaErro(mensagem, { estado = 'Error', link = '/' } = {}) {
 </div>`);
 }
 
-module.exports = { esc, paginaInicial, paginaServidores, paginaServidor, paginaErro };
+module.exports = {
+    esc,
+    paginaInicial,
+    paginaServidores,
+    paginaServidor,
+    paginaSetup,
+    paginaSetupConcluido,
+    paginaDefinicoes,
+    paginaErro,
+};

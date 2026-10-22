@@ -1,6 +1,6 @@
 # Discord Birthday Bot
 
-A Discord bot that wishes members a happy birthday on their day, across multiple servers, with a web panel to set up each server. It runs 24/7 in a Proxmox LXC (or Docker) and is published to the internet through a Cloudflare Tunnel.
+A Discord bot that wishes members a happy birthday on their day, across multiple servers, with a web panel to set up the bot and each server. It runs 24/7 in a Proxmox LXC (or Docker) and is published to the internet through a Cloudflare Tunnel.
 
 ## How it works
 
@@ -30,25 +30,25 @@ No command pings the people on the list.
 
 ## Web panel
 
-- **Log in with Discord**: everyone sees the servers where they have the **Manage Server** permission.
-- Servers without the bot have an **Add bot** button; the others, **Set up**.
+- **Setup page** (`/setup`): the first time, you paste the bot token, the OAuth2 client secret and the panel's public address. Everything is checked with Discord before it is saved, including whether Message Content Intent is on. The page asks for a **setup code** shown by the installer and in the bot's logs, so nobody else can set up your bot first.
+- **Log in with Discord**: everyone sees the servers where they have the **Manage Server** permission. Servers without the bot have an **Add bot** button; the others, **Set up**.
 - For each server you choose the channels, the time, the timezone, the message language and an optional custom message, and turn the monthly summary and the birthday messages on or off. The panel warns you if the bot is missing permissions in the chosen channels.
+- **Bot settings** (only for the owner of the Discord application): change the token, the client secret or the public address. A new token is tested before the old one is replaced.
 - The bot checks the permission on every request, so removing someone's permission in Discord takes effect right away.
+- If the saved token stops working (for example, it was reset), the setup page opens again so you can paste a new one.
 - `/health` returns `ok` while the bot is connected (handy for Uptime Kuma, for example).
 
-## Setting up Discord and Cloudflare
+## Before you install
 
-**Discord** ([Developer Portal](https://discord.com/developers/applications) → your application):
+**Discord** ([Developer Portal](https://discord.com/developers/applications)): create an application, then under **Bot** turn on **Message Content Intent**. You'll paste the bot token and the OAuth2 client secret on the setup page.
 
-1. **Bot** → turn on **Message Content Intent**.
-2. **OAuth2** → copy the **Client Secret** (this is `DISCORD_CLIENT_SECRET`).
-3. **OAuth2** → **Redirects** → add `https://bot.yourdomain.com/callback`.
-
-**Cloudflare** ([Zero Trust](https://one.dash.cloudflare.com/) → **Networks** → **Tunnels**):
+**Cloudflare** (optional, to reach the panel on your domain) — [Zero Trust](https://one.dash.cloudflare.com/) → **Networks** → **Tunnels**:
 
 1. **Create a tunnel** → **Cloudflared** → give it a name (e.g. `discord-bot`).
 2. Copy the **token** from the install command (the long part after `cloudflared service install`).
 3. **Public hostname**: subdomain `bot`, your domain, service **HTTP** → `localhost:3000`.
+
+Without a tunnel you can still do the setup on your local network at `http://<container-ip>:3000/setup`, but "Log in with Discord" needs the public address.
 
 ## One-command install on Proxmox (recommended)
 
@@ -58,13 +58,21 @@ On the **Proxmox host shell** (web UI → node → Shell):
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/proxmox-lxc.sh)"
 ```
 
-The script asks for the bot token, the panel address, the client secret and the tunnel token; it creates a Debian 12 LXC (1 core, 256 MB, 4 GB, DHCP, starts with Proxmox), installs the bot and the tunnel, and leaves everything running.
+The script only asks for the (optional) Cloudflare tunnel token. It creates a Debian 12 LXC (1 core, 256 MB, 4 GB, DHCP, starts with Proxmox), installs the bot and the tunnel, and ends with the setup page address and code:
+
+```
+👉 Finish the setup in your browser:
+   http://<container-ip>:3000/setup
+   Setup code: ABCD-EFGH
+```
+
+After the setup page, add the redirect it shows (`https://bot.yourdomain.com/callback`) in Developer Portal → **OAuth2** → **Redirects**, invite the bot to your server, and set the server up in the panel.
+
 To change the resources: `CTID=150 MEMORY=1024 STORAGE=local-zfs bash -c "$(curl ...)"`.
 
 ```bash
-pct exec <CTID> -- journalctl -u discord-bot -f              # logs
+pct exec <CTID> -- journalctl -u discord-bot -f              # logs (the setup code is here too)
 pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash'   # update to the latest release
-pct exec <CTID> -- nano /opt/discord-bot/.env                # change settings (then: systemctl restart discord-bot)
 ```
 
 ### Updating an older install (single server)
@@ -72,15 +80,14 @@ pct exec <CTID> -- nano /opt/discord-bot/.env                # change settings (
 On installs older than v3.0.0, the `install.sh` inside the LXC still always updates to `main`. Use the one from GitHub, with an explicit version:
 
 ```bash
-pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash -s -- v3.0.0'
+pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash -s -- v3.1.0'
 ```
 
-On first start, the bot moves `BIRTHDAY_CHANNEL_ID`, `GENERAL_CHANNEL_ID` and today's state into `data/guilds.json`, and keeps the messages in Portuguese as before. Everything keeps working. To turn on the panel:
+The bot keeps using the `BOT_TOKEN` from `.env` and keeps working as before: on first start it moves `BIRTHDAY_CHANNEL_ID`, `GENERAL_CHANNEL_ID` and today's state into `data/guilds.json`, with the messages still in Portuguese. To turn on the panel, install the tunnel and open the setup page, which then only asks for the client secret and the public address:
 
 ```bash
-pct exec <CTID> -- nano /opt/discord-bot/.env      # add PUBLIC_URL and DISCORD_CLIENT_SECRET
-pct exec <CTID> -- systemctl restart discord-bot
-pct exec <CTID> -- bash /opt/discord-bot/deploy/cloudflared.sh   # asks for the tunnel token
+pct exec <CTID> -- bash /opt/discord-bot/deploy/cloudflared.sh     # asks for the tunnel token
+pct exec <CTID> -- journalctl -u discord-bot | grep -A1 "Setup needed"   # setup page address and code
 ```
 
 ## Versions
@@ -100,7 +107,7 @@ pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branq
 pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash -s -- latest'
 ```
 
-`main` installs the latest code, not released yet. For a new LXC: `VERSION=v2.2.0 bash -c "$(curl -fsSL .../proxmox-lxc.sh)"`.
+`main` installs the latest code, not released yet. Versions before v3.1.0 have no setup page and need `BOT_TOKEN` in `.env`.
 
 To publish a new version: update `version` in `package.json` and `CHANGELOG.md`, commit, then `git tag vX.Y.Z && git push --tags`.
 
@@ -112,10 +119,9 @@ To publish a new version: update `version` in `package.json` and `CHANGELOG.md`,
    ```bash
    apt update && apt install -y curl
    bash -c "$(curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh)"
-   nano /opt/discord-bot/.env
-   systemctl restart discord-bot
    bash /opt/discord-bot/deploy/cloudflared.sh     # optional: Cloudflare Tunnel
    ```
+4. Open the setup page shown at the end of the install.
 
 The bot runs as a systemd service (`discord-bot`) under its own user, and restarts by itself if it crashes.
 
@@ -123,7 +129,7 @@ The bot runs as a systemd service (`discord-bot`) under its own user, and restar
 systemctl status discord-bot                              # status
 journalctl -u discord-bot -f                              # logs
 cd /opt/discord-bot && npm run dry-run                    # print each server's list without sending anything
-bash /opt/discord-bot/deploy/install.sh v2.2.0            # switch version (no argument: the latest)
+bash /opt/discord-bot/deploy/install.sh v3.1.0            # switch version (no argument: the latest)
 ```
 
 ## Docker install
@@ -134,8 +140,8 @@ On a VM or LXC with Docker and Docker Compose:
 git clone https://github.com/F-Branquinho/Discord-BOT.git discord-bot
 cd discord-bot
 cp .env.example .env
-nano .env
 docker compose up -d --build
+docker compose logs | grep -A1 "Setup needed"   # setup page address and code
 ```
 
 The panel is on port 3000 of the host; point the tunnel's public hostname at `http://<host-ip>:3000`.
@@ -145,29 +151,31 @@ The panel is on port 3000 of the host; point the tunnel's public hostname at `ht
 ```bash
 docker compose logs -f                       # logs
 docker compose run --rm bot npm run dry-run  # print each server's list without sending anything
-git fetch --tags && git checkout v3.0.0 && docker compose up -d --build   # switch version
+git fetch --tags && git checkout v3.1.0 && docker compose up -d --build   # switch version
 ```
 
-## Configuration (`.env`)
+## Configuration (`.env`, optional)
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `BOT_TOKEN` | yes | | Bot token |
-| `PUBLIC_URL` | for the panel | | Public panel address, e.g. `https://bot.yourdomain.com` |
-| `DISCORD_CLIENT_SECRET` | for the panel | | Developer Portal → OAuth2 → Client Secret |
-| `WEB_PORT` | no | `3000` | Panel port |
-| `WEB_HOST` | no | `0.0.0.0` | Interface the panel listens on (`127.0.0.1` if the tunnel runs in the same LXC) |
-| `TIMEZONE` | no | `Europe/Lisbon` | Default timezone for new servers |
-| `CHECK_TIME` | no | `00:01` | Default check time for new servers (HH:MM) |
-| `BOT_LANGUAGE` | no | `en` | Default message language for new servers (`en` or `pt`) |
-| `BIRTHDAY_MESSAGE` | no | | Default custom message for new servers; empty uses the language default. `{user}` is replaced by the mention |
-| `MONTHLY_SUMMARY` | no | `true` | Monthly summary on by default |
-| `BIRTHDAY_CHANNEL_ID`, `GENERAL_CHANNEL_ID` | no | | Single-server setup without the panel; moved to `guilds.json` on first start |
+The setup page saves the token, client secret and public address in `data/settings.json` (readable only by the bot). Anything set in `.env` wins over the panel and can then only be changed in `.env`.
+
+| Variable | Default | Description |
+|---|---|---|
+| `BOT_TOKEN` | | Bot token |
+| `DISCORD_CLIENT_SECRET` | | Developer Portal → OAuth2 → Client Secret |
+| `PUBLIC_URL` | | Public panel address, e.g. `https://bot.yourdomain.com` |
+| `WEB_PORT` | `3000` | Panel port |
+| `WEB_HOST` | `0.0.0.0` | Interface the panel listens on |
+| `TIMEZONE` | `Europe/Lisbon` | Default timezone for new servers |
+| `CHECK_TIME` | `00:01` | Default check time for new servers (HH:MM) |
+| `BOT_LANGUAGE` | `en` | Default message language for new servers (`en` or `pt`) |
+| `BIRTHDAY_MESSAGE` | | Default custom message for new servers; empty uses the language default. `{user}` is replaced by the mention |
+| `MONTHLY_SUMMARY` | `true` | Monthly summary on by default |
+| `BIRTHDAY_CHANNEL_ID`, `GENERAL_CHANNEL_ID` | | Single-server setup without the panel; moved to `guilds.json` on first start |
 
 ## Running without Docker
 
 ```bash
 npm install
-npm start
+npm start          # then open http://localhost:3000/setup
 npm run dry-run
 ```

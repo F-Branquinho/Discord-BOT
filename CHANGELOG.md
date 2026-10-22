@@ -2,6 +2,15 @@
 
 Each version is a GitHub tag. To install a specific version, see [Versions](README.md#versions) in the README.
 
+## v3.1.0
+
+- **Setup page**: the bot token, OAuth2 client secret and public address are set in the browser at `/setup`, protected by a one-time setup code shown by the installer and in the logs. Everything is checked with Discord before it is saved.
+- **Bot settings** page for the owner of the Discord application, to change the token, client secret or public address later. A new token is tested before replacing the old one.
+- If the saved token stops working, the setup page opens again to replace it.
+- The panel starts without a token; `.env` is now optional and still wins over the panel.
+- The Proxmox installer only asks for the (optional) Cloudflare tunnel token and ends with the setup page address and code.
+- The bot keeps retrying when it can't reach Discord (e.g. no network at boot) instead of exiting.
+
 ## v3.0.0
 
 - Multiple servers: each one with its own channels, time, timezone, message and monthly summary, stored in `data/guilds.json`.

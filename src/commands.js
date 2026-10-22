@@ -2,6 +2,7 @@ const { EmbedBuilder, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes, Sla
 const { version } = require('../package.json');
 const config = require('./config');
 const store = require('./store');
+const settings = require('./settings');
 const { idioma } = require('./i18n');
 const { lerAniversarios, fazAnosHoje, formatarData, nomeDoMes, aniversariosDoMes } = require('./birthdays');
 const { agoraNoFuso, proximaVerificacao, ultimaVerificacao } = require('./scheduler');
@@ -83,7 +84,7 @@ function formatarDuracao(ms) {
 }
 
 function linkPainel(guildId) {
-    return config.WEB_ENABLED ? `${config.PUBLIC_URL}/server/${guildId}` : null;
+    return settings.painelConfigurado() ? `${settings.obter().publicUrl}/server/${guildId}` : null;
 }
 
 /** Replies that the server isn't set up yet and returns null; otherwise returns its configuration. */
