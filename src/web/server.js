@@ -7,7 +7,7 @@ const settings = require('../settings');
 const { IDIOMAS } = require('../i18n');
 const { lerAniversarios, formatarData, nomeDoMes, aniversariosDoMes } = require('../birthdays');
 const { agoraNoFuso, proximaVerificacao, ultimaVerificacao } = require('../scheduler');
-const { urlConvite } = require('../commands');
+const { urlConvite, definicoes, PERMISSOES_CONVITE } = require('../commands');
 const views = require('./views');
 
 const API = 'https://discord.com/api/v10';
@@ -221,6 +221,11 @@ function iniciarPainel(bot) {
         res.status(ligado ? 200 : 503).type('text').send(texto);
     });
 
+    // Legal pages are always reachable, also before the setup and while the bot is offline
+    const nomeBot = () => cliente()?.user?.username ?? 'Birthday bot';
+    app.get('/privacy', (req, res) => res.send(views.paginaPrivacidade({ botNome: nomeBot() })));
+    app.get('/terms', (req, res) => res.send(views.paginaTermos({ botNome: nomeBot() })));
+
     // ---- Setup: open until the token, client secret and public address are all set
 
     /** Only asks for what is missing (plus the token when the saved one stopped working). */
@@ -320,9 +325,17 @@ function iniciarPainel(bot) {
     });
 
     app.get('/', (req, res) => {
-        const sessao = obterSessao(req);
-        if (!sessao) return res.send(views.paginaInicial({ bot: cliente().user }));
+        res.send(views.paginaInicial({
+            bot: cliente().user,
+            sessao: obterSessao(req),
+            servidores: cliente().guilds.cache.size,
+            comandos: definicoes.map((c) => ({ nome: c.name, descricao: c.description })),
+            exemplo: IDIOMAS.en.mensagemAniversario,
+        }));
+    });
 
+    app.get('/dashboard', exigirSessao, (req, res) => {
+        const { sessao } = req;
         const lista = [...sessao.guilds];
         if (sessao.dono) {
             // The bot owner also sees every server the bot is in
@@ -336,13 +349,12 @@ function iniciarPainel(bot) {
                 ...g,
                 temBot: cliente().guilds.cache.has(g.id),
                 configurado: Boolean(store.obterConfig(g.id)),
-                convite: urlConvite(cliente().user.id, g.id),
             }))
             .sort((a, b) => Number(b.temBot) - Number(a.temBot) || a.nome.localeCompare(b.nome));
         res.send(views.paginaServidores({ sessao, servidores }));
     });
 
-    app.get('/login', (req, res) => {
+    function autorizar(res, parametros) {
         const estado = crypto.randomBytes(16).toString('hex');
         definirCookie(res, COOKIE_ESTADO, estado, 10 * 60 * 1000);
         const url = new URL('https://discord.com/oauth2/authorize');
@@ -350,11 +362,23 @@ function iniciarPainel(bot) {
             client_id: cliente().user.id,
             response_type: 'code',
             redirect_uri: redirectUri(),
-            scope: 'identify guilds',
             state: estado,
-            prompt: 'none',
+            ...parametros,
         }).toString();
         res.redirect(url.toString());
+    }
+
+    app.get('/login', (req, res) => autorizar(res, { scope: 'identify guilds', prompt: 'none' }));
+
+    // "Add to Discord": adds the bot and logs in at once, then Discord sends the person back to that server's page
+    app.get('/add', (req, res) => {
+        const parametros = {
+            scope: 'bot applications.commands identify guilds',
+            permissions: String(PERMISSOES_CONVITE),
+        };
+        const guild = typeof req.query.guild === 'string' && /^\d{17,20}$/.test(req.query.guild) ? req.query.guild : null;
+        if (guild) Object.assign(parametros, { guild_id: guild, disable_guild_select: 'true' });
+        autorizar(res, parametros);
     });
 
     app.get('/callback', async (req, res, next) => {
@@ -408,7 +432,16 @@ function iniciarPainel(bot) {
             });
             definirCookie(res, COOKIE_SESSAO, id, SESSAO_MAX_MS);
             console.log(`🔑 Panel login: ${user.username} (${user.id})${dono ? ' [owner]' : ''}`);
-            res.redirect('/');
+
+            // Coming from "Add to Discord": wait for the bot to join, then open that server's page
+            const adicionado = typeof req.query.guild_id === 'string' && /^\d{17,20}$/.test(req.query.guild_id) ? req.query.guild_id : null;
+            if (adicionado) {
+                for (let i = 0; i < 20 && !cliente().guilds.cache.has(adicionado); i++) {
+                    await new Promise((r) => setTimeout(r, 250));
+                }
+                return res.redirect(`/server/${adicionado}`);
+            }
+            res.redirect('/dashboard');
         } catch (error) {
             next(error);
         }
@@ -484,7 +517,7 @@ function iniciarPainel(bot) {
     function negar(req, res) {
         const { id } = req.params;
         if (!cliente().guilds.cache.has(id) && req.sessao.guilds.some((g) => g.id === id)) {
-            return res.redirect(urlConvite(cliente().user.id, id));
+            return res.redirect(`/add?guild=${id}`);
         }
         return res.status(403).send(views.paginaErro("You don't have the Manage Server permission in this server.", { estado: 'No access' }));
     }

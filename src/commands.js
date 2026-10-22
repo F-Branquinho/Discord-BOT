@@ -251,4 +251,4 @@ async function tratarInteracao(interaction) {
     }
 }
 
-module.exports = { AJUDA, definicoes, formatarDuracao, registarComandos, tratarInteracao, urlConvite };
+module.exports = { AJUDA, PERMISSOES_CONVITE, definicoes, formatarDuracao, registarComandos, tratarInteracao, urlConvite };

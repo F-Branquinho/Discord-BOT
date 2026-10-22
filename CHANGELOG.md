@@ -2,6 +2,14 @@
 
 Each version is a GitHub tag. To install a specific version, see [Versions](README.md#versions) in the README.
 
+## v3.3.0
+
+- Public landing page at `/` with the features, how it works, the commands and an example of the messages.
+- **Add to Discord** adds the bot and logs you in at once, then opens that server's settings page.
+- The server list moved to `/dashboard`.
+- Privacy policy (`/privacy`) and terms of service (`/terms`), linked from every page.
+- When the bot is removed from a server, that server's settings and state are deleted.
+
 ## v3.2.0
 
 - The owner of the bot application sees and can set up every server the bot is in, even without Manage Server there (whoever holds the bot token already controls the bot in those servers).

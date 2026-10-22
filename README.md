@@ -30,8 +30,10 @@ No command pings the people on the list.
 
 ## Web panel
 
+- **Landing page** (`/`): what the bot does, its commands and an **Add to Discord** button. Adding the bot also logs you in and opens that server's settings.
+- **Privacy policy** (`/privacy`) and **terms** (`/terms`): paste these addresses in Developer Portal → General Information (Privacy Policy URL, Terms of Service URL).
 - **Setup page** (`/setup`): the first time, you paste the bot token, the OAuth2 client secret and the panel's public address. Everything is checked with Discord before it is saved, including whether Message Content Intent is on. The page asks for a **setup code** shown by the installer and in the bot's logs, so nobody else can set up your bot first.
-- **Log in with Discord**: everyone sees the servers where they have the **Manage Server** permission. The owner of the bot application sees every server the bot is in. Servers without the bot have an **Add bot** button; the others, **Set up**.
+- **Dashboard** (`/dashboard`, after logging in with Discord): everyone sees the servers where they have the **Manage Server** permission. The owner of the bot application sees every server the bot is in. Servers without the bot have an **Add bot** button; the others, **Set up**.
 - For each server you choose the channels, the time, the timezone, the message language and an optional custom message, and turn the monthly summary and the birthday messages on or off. The panel warns you if the bot is missing permissions in the chosen channels.
 - **Bot settings** (only for the owner of the Discord application): change the token, the client secret or the public address. A new token is tested before the old one is replaced.
 - The bot checks the permission on every request, so removing someone's permission in Discord takes effect right away.

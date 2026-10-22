@@ -99,6 +99,13 @@ function existeServidor(guildId) {
     return Boolean(dados.guilds[guildId]);
 }
 
+/** Forgets a server's settings and state (when the bot is removed from it). */
+function removerServidor(guildId) {
+    if (!dados.guilds[guildId]) return;
+    delete dados.guilds[guildId];
+    guardar();
+}
+
 module.exports = {
     configPorOmissao,
     obterConfig,
@@ -107,4 +114,5 @@ module.exports = {
     lerEstado,
     guardarEstado,
     existeServidor,
+    removerServidor,
 };

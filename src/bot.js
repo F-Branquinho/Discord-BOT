@@ -4,6 +4,7 @@ const { Client, Events, GatewayIntentBits } = require('discord.js');
 const { version } = require('../package.json');
 const config = require('./config');
 const settings = require('./settings');
+const store = require('./store');
 const { verificarAgora } = require('./scheduler');
 const { registarComandos, tratarInteracao } = require('./commands');
 const { migrarConfigAntiga } = require('./migrate');
@@ -32,7 +33,12 @@ function criarCliente() {
         console.log(`➕ Added to server ${guild.name} (${guild.id})`);
         registarComandos(guild).catch((error) => console.error(`❌ Failed to register slash commands in ${guild.name}:`, error));
     });
-    client.on(Events.GuildDelete, (guild) => console.log(`➖ Removed from server ${guild.name ?? guild.id}`));
+    client.on(Events.GuildDelete, (guild) => {
+        // Discord also sends this during outages, with the server marked unavailable: keep its settings then
+        if (guild.available === false) return;
+        console.log(`➖ Removed from server ${guild.name ?? guild.id}, deleting its settings`);
+        store.removerServidor(guild.id);
+    });
     client.on(Events.InteractionCreate, tratarInteracao);
     client.on(Events.Error, (error) => console.error('❌ Discord client error:', error));
     return client;
