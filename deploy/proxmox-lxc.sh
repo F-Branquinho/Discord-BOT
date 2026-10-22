@@ -3,7 +3,7 @@
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/proxmox-lxc.sh)"
 #
 # Opções (variáveis de ambiente, todas opcionais):
-#   CTID, CT_HOSTNAME, STORAGE, BRIDGE, CORES, MEMORY, DISK, TEMPLATE
+#   VERSION (latest, uma tag como v2.2.0, ou main), CTID, CT_HOSTNAME, STORAGE, BRIDGE, CORES, MEMORY, DISK, TEMPLATE
 #   BOT_TOKEN, PUBLIC_URL, DISCORD_CLIENT_SECRET, CLOUDFLARE_TUNNEL_TOKEN,
 #   BIRTHDAY_CHANNEL_ID, GENERAL_CHANNEL_ID, TIMEZONE, CHECK_TIME
 set -euo pipefail
@@ -145,7 +145,7 @@ pct exec "$CTID" -- getent hosts deb.debian.org >/dev/null 2>&1 || erro "Contain
 echo "📦 Installing the bot (this may take a few minutes)..."
 # C.UTF-8 existe sempre; o en_US.UTF-8 herdado do Proxmox não está instalado no template.
 # SKIP_START: o .env só é copiado a seguir, por isso o install.sh não deve arrancar o bot.
-pct exec "$CTID" -- env LANG=C.UTF-8 LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive SKIP_START=1 \
+pct exec "$CTID" -- env LANG=C.UTF-8 LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive SKIP_START=1 VERSION="${VERSION:-latest}" \
     bash -c "apt-get update -qq && apt-get install -y -qq curl >/dev/null && curl -fsSL '$INSTALL_URL' | bash"
 
 # Escrever o .env sem que o token apareça na linha de comandos

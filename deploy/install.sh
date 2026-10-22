@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Instala ou atualiza o bot num LXC/VM Debian ou Ubuntu. Correr como root.
-# Voltar a correr este script atualiza o bot para a versão mais recente.
+#
+# Versão a instalar (argumento ou VERSION=...):
+#   latest   a release mais recente (por omissão)
+#   v2.2.0   uma release específica (tag do GitHub)
+#   main     o código mais recente, ainda sem release
+#   --list   mostra as versões disponíveis e a instalada, sem mudar nada
 set -euo pipefail
 
 export LANG=C.UTF-8 LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive
@@ -10,11 +15,24 @@ REPO="https://github.com/F-Branquinho/Discord-BOT.git"
 DIR="/opt/discord-bot"
 UTILIZADOR="discordbot"
 SERVICO="discord-bot"
+VERSION="${1:-${VERSION:-latest}}"
 
-if [ "$(id -u)" -ne 0 ]; then
-    echo "❌ Run this script as root." >&2
-    exit 1
+erro() { echo "❌ $*" >&2; exit 1; }
+
+versoes_disponiveis() {
+    git ls-remote --tags --refs "$REPO" | sed 's#.*refs/tags/##' | grep '^v' | sort -V
+}
+
+if [ "$VERSION" = "--list" ]; then
+    echo "Available versions:"
+    versoes_disponiveis | sed 's/^/  /'
+    if [ -d "$DIR/.git" ]; then
+        echo "Installed: $(git -C "$DIR" describe --tags --always 2>/dev/null)"
+    fi
+    exit 0
 fi
+
+[ "$(id -u)" -eq 0 ] || erro "Run this script as root."
 
 echo "📦 Installing system dependencies..."
 apt-get update -qq
@@ -32,14 +50,28 @@ if ! id "$UTILIZADOR" >/dev/null 2>&1; then
 fi
 
 if [ -d "$DIR/.git" ]; then
-    echo "🔄 Updating code..."
-    git -C "$DIR" pull --ff-only
+    echo "🔄 Fetching versions..."
+    git -C "$DIR" fetch --quiet --tags --force origin
 else
     echo "⬇ Downloading code..."
-    git clone "$REPO" "$DIR"
+    git clone --quiet "$REPO" "$DIR"
 fi
 
 cd "$DIR"
+if [ "$VERSION" = "latest" ]; then
+    VERSION="$(git tag -l 'v*' --sort=-v:refname | head -1)"
+    [ -n "$VERSION" ] || erro "No releases found. Use VERSION=main to install the latest code."
+fi
+if [ "$VERSION" = "main" ]; then
+    git checkout --quiet main
+    git reset --quiet --hard origin/main
+else
+    git rev-parse --quiet --verify "refs/tags/$VERSION" >/dev/null \
+        || erro "Version $VERSION not found. Available: $(git tag -l 'v*' --sort=v:refname | tr '\n' ' ')"
+    git checkout --quiet --detach "refs/tags/$VERSION"
+fi
+echo "📌 Version $VERSION ($(git rev-parse --short HEAD))"
+
 echo "📦 Installing npm packages..."
 npm ci --omit=dev --no-audit --no-fund --loglevel=error
 

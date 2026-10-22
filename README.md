@@ -64,14 +64,16 @@ Para mudar os recursos: `CTID=150 MEMORY=1024 STORAGE=local-zfs bash -c "$(curl 
 
 ```bash
 pct exec <CTID> -- journalctl -u discord-bot -f              # logs
-pct exec <CTID> -- bash /opt/discord-bot/deploy/install.sh   # atualizar
+pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash'   # atualizar para a release mais recente
 pct exec <CTID> -- nano /opt/discord-bot/.env                # mudar configuração (depois: systemctl restart discord-bot)
 ```
 
 ### Atualizar uma instalação antiga (um só servidor)
 
+Nas instalações anteriores à v3.0.0, o `install.sh` que está no LXC ainda atualiza sempre para o `main`. Usa o do GitHub, com a versão explícita:
+
 ```bash
-pct exec <CTID> -- bash /opt/discord-bot/deploy/install.sh
+pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash -s -- v3.0.0'
 ```
 
 No primeiro arranque, o bot passa sozinho o `BIRTHDAY_CHANNEL_ID`, o `GENERAL_CHANNEL_ID` e o estado de hoje para o `data/guilds.json`. Tudo continua a funcionar como antes. Para ligar o painel:
@@ -81,6 +83,27 @@ pct exec <CTID> -- nano /opt/discord-bot/.env      # acrescenta PUBLIC_URL e DIS
 pct exec <CTID> -- systemctl restart discord-bot
 pct exec <CTID> -- bash /opt/discord-bot/deploy/cloudflared.sh   # pede o token do túnel
 ```
+
+## Versões
+
+Cada versão é uma tag do GitHub (ver o [CHANGELOG](CHANGELOG.md)). O bot nunca se atualiza sozinho: só muda de versão quando corres o instalador.
+
+Usa sempre o instalador do `main` (é ele que sabe escolher versões), dentro do LXC:
+
+```bash
+# ver as versões disponíveis e a instalada
+pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash -s -- --list'
+
+# instalar uma versão específica (também serve para voltar atrás)
+pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash -s -- v2.2.0'
+
+# instalar a mais recente
+pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash -s -- latest'
+```
+
+`main` instala o código mais recente, ainda sem release. Num LXC novo: `VERSION=v2.2.0 bash -c "$(curl -fsSL .../proxmox-lxc.sh)"`.
+
+Para publicar uma versão nova: atualizar a `version` no `package.json` e o `CHANGELOG.md`, fazer commit, e `git tag vX.Y.Z && git push --tags`.
 
 ## Instalação manual num LXC
 
@@ -101,7 +124,7 @@ O bot corre como serviço systemd (`discord-bot`), com utilizador próprio, e re
 systemctl status discord-bot                              # estado
 journalctl -u discord-bot -f                              # logs
 cd /opt/discord-bot && node src/index.js --testar         # mostra a lista de cada servidor, sem enviar nada
-bash /opt/discord-bot/deploy/install.sh                   # atualizar para a versão mais recente
+bash /opt/discord-bot/deploy/install.sh v2.2.0            # mudar de versão (sem argumento: a mais recente)
 ```
 
 ## Instalação com Docker
@@ -123,7 +146,7 @@ O painel fica na porta 3000 do host; aponta o public hostname do túnel para `ht
 ```bash
 docker compose logs -f                      # ver logs
 docker compose run --rm bot npm run testar  # mostra a lista de cada servidor, sem enviar nada
-git pull && docker compose up -d --build    # atualizar
+git fetch --tags && git checkout v3.0.0 && docker compose up -d --build   # mudar de versão
 ```
 
 ## Configuração (`.env`)

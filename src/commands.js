@@ -1,4 +1,5 @@
 const { EmbedBuilder, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes, SlashCommandBuilder } = require('discord.js');
+const { version } = require('../package.json');
 const config = require('./config');
 const store = require('./store');
 const { lerAniversarios, fazAnosHoje, formatarData, nomeDoMes, aniversariosDoMes } = require('./birthdays');
@@ -166,6 +167,7 @@ async function status(interaction) {
         `🔍 Última verificação: ${ultima}`,
         `⏰ Próxima verificação: ${proximaVerificacao(interaction.guildId, cfg)}`,
         `📅 Resumo mensal: ${cfg.monthlySummary ? 'ligado (dia 1)' : 'desligado'}`,
+        `🏷 Versão ${version}`,
     ];
     if (ping >= 0) linhas.push(`📶 Ping: ${ping} ms`);
     const painel = linkPainel(interaction.guildId);

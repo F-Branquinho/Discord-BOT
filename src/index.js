@@ -1,4 +1,5 @@
 const { Client, Events, GatewayIntentBits } = require('discord.js');
+const { version } = require('../package.json');
 const config = require('./config');
 const store = require('./store');
 const { lerAniversarios, fazAnosHoje, formatarData, mensagemResumoMensal } = require('./birthdays');
@@ -45,7 +46,7 @@ async function testar() {
 }
 
 client.once(Events.ClientReady, async () => {
-    console.log(`✅ Bot online as ${client.user.tag} in ${client.guilds.cache.size} servers`);
+    console.log(`✅ Bot v${version} online as ${client.user.tag} in ${client.guilds.cache.size} servers`);
 
     if (MODO_TESTE) {
         try {
