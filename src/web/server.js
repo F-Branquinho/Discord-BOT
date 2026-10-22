@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const config = require('../config');
@@ -16,6 +18,7 @@ const COOKIE_ESTADO = 'oauth_state';
 const SESSAO_MAX_MS = 7 * 24 * 60 * 60 * 1000;
 const TIPOS_TEXTO = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 const FUSOS = Intl.supportedValuesOf('timeZone');
+const SCRIPT_PAINEL = fs.readFileSync(path.join(__dirname, 'panel.js'), 'utf8');
 const { ViewChannel, SendMessages, ReadMessageHistory, ManageGuild, Administrator } = PermissionFlagsBits;
 // Wrong setup codes allowed per window, so the code can't be guessed
 const MAX_FALHAS_SETUP = 10;
@@ -204,7 +207,7 @@ function iniciarPainel(bot) {
     app.disable('x-powered-by');
     app.use((req, res, next) => {
         res.set({
-            'Content-Security-Policy': "default-src 'none'; img-src https://cdn.discordapp.com; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+            'Content-Security-Policy': "default-src 'none'; img-src https://cdn.discordapp.com; style-src 'unsafe-inline'; script-src 'self'; form-action 'self'; frame-ancestors 'none'",
             'X-Content-Type-Options': 'nosniff',
             'Referrer-Policy': 'same-origin',
         });
@@ -223,6 +226,9 @@ function iniciarPainel(bot) {
 
     // Legal pages are always reachable, also before the setup and while the bot is offline
     const nomeBot = () => cliente()?.user?.username ?? 'Birthday bot';
+    app.get('/panel.js', (req, res) => {
+        res.set('Cache-Control', 'public, max-age=3600').type('application/javascript').send(SCRIPT_PAINEL);
+    });
     app.get('/privacy', (req, res) => res.send(views.paginaPrivacidade({ botNome: nomeBot() })));
     app.get('/terms', (req, res) => res.send(views.paginaTermos({ botNome: nomeBot() })));
 

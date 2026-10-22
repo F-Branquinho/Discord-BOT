@@ -125,6 +125,7 @@ function layout(titulo, corpo, { larga = false, descricao } = {}) {
 <title>${esc(titulo)}</title>
 ${descricao ? `<meta name="description" content="${esc(descricao)}">` : ''}
 <style>${CSS}</style>
+<script src="/panel.js" defer></script>
 </head>
 <body>
 <main${larga ? ' class="larga"' : ''}>${corpo}</main>
@@ -328,7 +329,7 @@ ${cartaoResumo}
   </div>
 
   <label for="language">Message language</label>
-  <select id="language" name="language" required>${Object.entries(idiomas).map(([codigo, i]) => `<option value="${esc(codigo)}"${codigo === cfg.language ? ' selected' : ''}>${esc(i.nome)}</option>`).join('')}</select>
+  <select id="language" name="language" required data-mensagens="${esc(JSON.stringify(Object.fromEntries(Object.entries(idiomas).map(([codigo, i]) => [codigo, i.mensagemAniversario]))))}">${Object.entries(idiomas).map(([codigo, i]) => `<option value="${esc(codigo)}"${codigo === cfg.language ? ' selected' : ''}>${esc(i.nome)}</option>`).join('')}</select>
   <div class="ajuda">Language of the birthday message and the monthly summary posted in this server.</div>
 
   <label for="message">Custom birthday message (optional)</label>

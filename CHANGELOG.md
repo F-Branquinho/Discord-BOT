@@ -2,6 +2,10 @@
 
 Each version is a GitHub tag. To install a specific version, see [Versions](README.md#versions) in the README.
 
+## v3.3.1
+
+- In the server settings, the custom message placeholder switches to the chosen language right away, without saving first.
+
 ## v3.3.0
 
 - Public landing page at `/` with the features, how it works, the commands and an example of the messages.
