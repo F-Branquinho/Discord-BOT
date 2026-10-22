@@ -1,4 +1,4 @@
-const { MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes, SlashCommandBuilder } = require('discord.js');
 const config = require('./config');
 const { lerAniversarios, fazAnosHoje, formatarData, nomeDoMes, aniversariosDoMes } = require('./birthdays');
 const { agoraNoFuso } = require('./scheduler');
@@ -23,7 +23,19 @@ const definicoes = [
     new SlashCommandBuilder()
         .setName('aniversarios-proximos')
         .setDescription('Mostra os aniversários deste mês'),
+    new SlashCommandBuilder()
+        .setName('aniversario-help')
+        .setDescription('Explica o que o bot faz e os comandos disponíveis'),
 ].map((c) => c.toJSON());
+
+// Texto do /aniversario-help para cada comando
+const AJUDA = {
+    'aniversario-adicionar': 'Adiciona ou altera o teu aniversário, ex: `/aniversario-adicionar data:25/12`.\n'
+        + 'Com `utilizador:` adicionas o de outra pessoa (precisa da permissão **Gerir servidor**).',
+    'aniversario-status': 'Mostra se o bot está a correr, há quanto tempo, e a última e a próxima verificação.',
+    'aniversarios-proximos': 'Lista os aniversários deste mês. Os que já passaram aparecem riscados.',
+    'aniversario-help': 'Mostra esta ajuda.',
+};
 
 /**
  * Regista os comandos no servidor do canal geral. Comandos de servidor ficam disponíveis logo,
@@ -153,10 +165,28 @@ async function proximos(interaction) {
     });
 }
 
+/** @param {import('discord.js').ChatInputCommandInteraction} interaction */
+async function ajuda(interaction) {
+    const funcionamento = [
+        `🎉 Todos os dias às **${config.CHECK_TIME}** (${config.TIMEZONE}) dou os parabéns em <#${config.GENERAL_CHANNEL_ID}> a quem faz anos.`,
+        `📋 A lista está em <#${config.BIRTHDAY_CHANNEL_ID}>, uma linha por pessoa: \`25/12 - @pessoa\`.`,
+    ];
+    if (config.MONTHLY_SUMMARY) funcionamento.push('📅 No dia 1 de cada mês publico a lista dos aniversários desse mês.');
+
+    const embed = new EmbedBuilder()
+        .setColor(0xf47fff)
+        .setTitle('🎂 Bot de aniversários')
+        .setDescription(funcionamento.join('\n'))
+        .addFields(definicoes.map((c) => ({ name: `/${c.name}`, value: AJUDA[c.name] ?? c.description })))
+        .setFooter({ text: 'Nenhum comando notifica as pessoas da lista.' });
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+}
+
 const handlers = {
     'aniversario-adicionar': adicionar,
     'aniversario-status': status,
     'aniversarios-proximos': proximos,
+    'aniversario-help': ajuda,
 };
 
 /** @param {import('discord.js').Interaction} interaction */
@@ -178,4 +208,4 @@ async function tratarInteracao(interaction) {
     }
 }
 
-module.exports = { definicoes, formatarDuracao, registarComandos, tratarInteracao };
+module.exports = { AJUDA, definicoes, formatarDuracao, registarComandos, tratarInteracao };

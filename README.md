@@ -23,6 +23,7 @@ Bot de Discord que lê a lista de aniversários de um canal e dá os parabéns n
 | `/aniversario-adicionar data:25/12` | Adiciona ou altera o teu aniversário. Com `utilizador:`, adiciona o de outra pessoa (precisa de **Gerir servidor**). O bot escreve a linha no canal de aniversários. |
 | `/aniversario-status` | Mostra se o bot está a correr, há quanto tempo, a última e a próxima verificação. |
 | `/aniversarios-proximos` | Lista os aniversários deste mês (os que já passaram aparecem riscados). |
+| `/aniversario-help` | Explica o que o bot faz e lista os comandos (só tu vês a resposta). |
 
 Nenhum comando notifica as pessoas listadas.
 
