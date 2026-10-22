@@ -6,7 +6,8 @@
 #
 # Options (environment variables, all optional):
 #   VERSION (latest, a tag such as v3.1.0, or main), CTID, CT_HOSTNAME, STORAGE, BRIDGE, CORES, MEMORY, DISK,
-#   TEMPLATE, TIMEZONE (of the container), CLOUDFLARE_TUNNEL_TOKEN
+#   TEMPLATE, TIMEZONE (of the container), CLOUDFLARE_TUNNEL_TOKEN,
+#   IP and GATEWAY for a static address (e.g. IP=192.0.2.50/24 GATEWAY=192.0.2.1; default: DHCP)
 set -euo pipefail
 
 INSTALL_URL="https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh"
@@ -18,6 +19,8 @@ CT_HOSTNAME="${CT_HOSTNAME:-discord-bot}"
 STORAGE="${STORAGE:-$(pvesm status -content rootdir | awk 'NR>1 && $3=="active" {print $1; exit}')}"
 TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-$(pvesm status -content vztmpl | awk 'NR>1 && $3=="active" {print $1; exit}')}"
 BRIDGE="${BRIDGE:-vmbr0}"
+IP="${IP:-dhcp}"
+GATEWAY="${GATEWAY:-}"
 CORES="${CORES:-1}"
 MEMORY="${MEMORY:-256}"
 DISK="${DISK:-4}"
@@ -37,6 +40,11 @@ command -v pct >/dev/null || erro "This script must run on the Proxmox host shel
 [ -n "$STORAGE" ] || erro "No container storage found (set STORAGE=...)."
 [ -n "$TEMPLATE_STORAGE" ] || erro "No template storage found (set TEMPLATE_STORAGE=...)."
 [ -f "/usr/share/zoneinfo/$TIMEZONE" ] || erro "Invalid TIMEZONE: $TIMEZONE"
+if [ "$IP" != "dhcp" ]; then
+    [[ "$IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$ ]] || erro "IP must look like 192.0.2.50/24"
+    [[ "$GATEWAY" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || erro "A static IP also needs GATEWAY (e.g. GATEWAY=192.0.2.1)"
+fi
+REDE="name=eth0,bridge=$BRIDGE,ip=$IP${GATEWAY:+,gw=$GATEWAY}"
 case "$VERSION" in
     v1.* | v2.* | v3.0.*)
         erro "Version $VERSION has no setup page. Use v3.1.0 or later, or install it with deploy/install.sh and fill in its .env." ;;
@@ -60,7 +68,7 @@ if [ -n "$TUNEL" ] && ! [[ "$TUNEL" =~ ^[A-Za-z0-9_=-]{50,}$ ]]; then
 fi
 
 echo
-echo "CT $CTID ($CT_HOSTNAME): $CORES core, ${MEMORY} MB RAM, ${DISK} GB on $STORAGE, network $BRIDGE (DHCP)"
+echo "CT $CTID ($CT_HOSTNAME): $CORES core, ${MEMORY} MB RAM, ${DISK} GB on $STORAGE, network $BRIDGE ($IP)"
 echo "Version: $VERSION. Cloudflare Tunnel: $([ -n "$TUNEL" ] && echo yes || echo no)"
 read -rp "Continue? [Y/n] " CONFIRMAR
 [[ "${CONFIRMAR:-Y}" =~ ^[YySs]$ ]] || erro "Cancelled."
@@ -84,7 +92,7 @@ pct create "$CTID" "$TEMPLATE_STORAGE:vztmpl/$TEMPLATE" \
     --memory "$MEMORY" \
     --swap 512 \
     --rootfs "$STORAGE:$DISK" \
-    --net0 "name=eth0,bridge=$BRIDGE,ip=dhcp" \
+    --net0 "$REDE" \
     --unprivileged 1 \
     --features nesting=1 \
     --onboot 1 \

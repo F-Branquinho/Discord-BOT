@@ -50,6 +50,8 @@ No command pings the people on the list.
 
 Without a tunnel you can still do the setup on your local network at `http://<container-ip>:3000/setup`, but "Log in with Discord" needs the public address.
 
+If the tunnel runs somewhere else (for example, in its own LXC that also publishes other services), skip the tunnel token in the installer, give the bot a static IP (`IP=... GATEWAY=...`, see below) and point the public hostname at `http://<bot-ip>:3000` instead of `localhost:3000`.
+
 ## One-command install on Proxmox (recommended)
 
 On the **Proxmox host shell** (web UI → node → Shell):
@@ -68,7 +70,7 @@ The script only asks for the (optional) Cloudflare tunnel token. It creates a De
 
 After the setup page, add the redirect it shows (`https://bot.yourdomain.com/callback`) in Developer Portal → **OAuth2** → **Redirects**, invite the bot to your server, and set the server up in the panel.
 
-To change the resources: `CTID=150 MEMORY=1024 STORAGE=local-zfs bash -c "$(curl ...)"`.
+To change the resources: `CTID=150 MEMORY=1024 STORAGE=local-zfs bash -c "$(curl ...)"`. For a static address instead of DHCP: `IP=192.0.2.50/24 GATEWAY=192.0.2.1 bash -c "$(curl ...)"`.
 
 ```bash
 pct exec <CTID> -- journalctl -u discord-bot -f              # logs (the setup code is here too)
