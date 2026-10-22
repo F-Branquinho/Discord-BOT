@@ -1,10 +1,12 @@
 const { Client, Events, GatewayIntentBits } = require('discord.js');
 const config = require('./config');
-const { lerAniversarios, fazAnosHoje, mensagemResumoMensal } = require('./birthdays');
+const store = require('./store');
+const { lerAniversarios, fazAnosHoje, formatarData, mensagemResumoMensal } = require('./birthdays');
 const { agoraNoFuso, iniciarAgendador } = require('./scheduler');
 const { registarComandos, tratarInteracao } = require('./commands');
+const { configAntiga, migrarConfigAntiga } = require('./migrate');
 
-// --testar: mostra a lista lida do canal e quem faz anos hoje, sem enviar nada
+// --testar: mostra a lista lida de cada servidor e quem faz anos hoje, sem enviar nada
 const MODO_TESTE = process.argv.includes('--testar');
 
 const client = new Client({
@@ -14,28 +16,36 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
     ],
 });
+let painel = null;
 
 async function testar() {
-    const hoje = agoraNoFuso(config.TIMEZONE);
-    const lista = await lerAniversarios(client);
-    lista.sort((a, b) => a.mes - b.mes || a.dia - b.dia);
-
-    console.log(`\n📋 ${lista.length} birthdays found:`);
-    for (const a of lista) {
-        const data = `${String(a.dia).padStart(2, '0')}/${String(a.mes).padStart(2, '0')}`;
-        const user = await client.users.fetch(a.userId).catch(() => null);
-        const marca = fazAnosHoje(a, hoje) ? '  ← TODAY' : '';
-        console.log(`  ${data}  ${user?.tag ?? '(unknown)'} (${a.userId})${marca}`);
+    const servidores = store.servidoresConfigurados();
+    if (servidores.length === 0) {
+        const antiga = await configAntiga(client);
+        if (antiga) servidores.push([antiga.guild.id, antiga.cfg]);
     }
-    console.log(`\nNow: ${hoje.data} ${hoje.horaMinuto} in ${config.TIMEZONE}`);
+    if (servidores.length === 0) console.log('\nNo configured servers.');
 
-    const resumo = mensagemResumoMensal(lista, hoje);
-    console.log(`\n📅 Monthly summary preview (sent on day 1${config.MONTHLY_SUMMARY ? '' : ', disabled'}):`);
-    console.log(resumo ?? '(no birthdays this month, nothing would be sent)');
+    for (const [guildId, cfg] of servidores) {
+        const nome = client.guilds.cache.get(guildId)?.name ?? guildId;
+        const hoje = agoraNoFuso(cfg.timezone);
+        const lista = await lerAniversarios(client, cfg.birthdayChannelId);
+        lista.sort((a, b) => a.mes - b.mes || a.dia - b.dia);
+
+        console.log(`\n=== ${nome}: ${lista.length} birthdays, check at ${cfg.checkTime} ${cfg.timezone}${cfg.enabled ? '' : ' (disabled)'}`);
+        for (const a of lista) {
+            const user = await client.users.fetch(a.userId).catch(() => null);
+            const marca = fazAnosHoje(a, hoje) ? '  ← TODAY' : '';
+            console.log(`  ${formatarData(a.dia, a.mes)}  ${user?.tag ?? '(unknown)'} (${a.userId})${marca}`);
+        }
+        console.log(`Now: ${hoje.data} ${hoje.horaMinuto} in ${cfg.timezone}`);
+        console.log(`📅 Monthly summary preview (sent on day 1${cfg.monthlySummary ? '' : ', disabled'}):`);
+        console.log(mensagemResumoMensal(lista, hoje) ?? '(no birthdays this month, nothing would be sent)');
+    }
 }
 
 client.once(Events.ClientReady, async () => {
-    console.log(`✅ Bot online as ${client.user.tag}`);
+    console.log(`✅ Bot online as ${client.user.tag} in ${client.guilds.cache.size} servers`);
 
     if (MODO_TESTE) {
         try {
@@ -48,16 +58,32 @@ client.once(Events.ClientReady, async () => {
         return;
     }
 
+    await migrarConfigAntiga(client).catch((error) => console.error('❌ Migration failed:', error));
     iniciarAgendador(client);
-    registarComandos(client).catch((error) => console.error('❌ Failed to register slash commands:', error));
+
+    if (config.WEB_ENABLED) {
+        painel = require('./web/server').iniciarPainel(client);
+    } else {
+        console.log('ℹ Web panel disabled (set PUBLIC_URL and DISCORD_CLIENT_SECRET to enable it)');
+    }
+
+    for (const guild of client.guilds.cache.values()) {
+        await registarComandos(guild).catch((error) => console.error(`❌ Failed to register slash commands in ${guild.name}:`, error));
+    }
 });
 
+client.on(Events.GuildCreate, (guild) => {
+    console.log(`➕ Added to server ${guild.name} (${guild.id})`);
+    registarComandos(guild).catch((error) => console.error(`❌ Failed to register slash commands in ${guild.name}:`, error));
+});
+client.on(Events.GuildDelete, (guild) => console.log(`➖ Removed from server ${guild.name ?? guild.id}`));
 client.on(Events.InteractionCreate, tratarInteracao);
 client.on(Events.Error, (error) => console.error('❌ Discord client error:', error));
 process.on('unhandledRejection', (error) => console.error('❌ Unhandled promise rejection:', error));
 
 async function encerrar(sinal) {
     console.log(`👋 ${sinal} received, shutting down...`);
+    painel?.close();
     await client.destroy();
     process.exit(0);
 }

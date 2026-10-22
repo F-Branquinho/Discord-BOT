@@ -1,5 +1,4 @@
 const { RESTJSONErrorCodes } = require('discord.js');
-const config = require('./config');
 
 // Aceita "25/12 - @utilizador", "5/3 – @utilizador", "25/12: @utilizador"
 const REGEX_ANIVERSARIO = /(\d{1,2})\/(\d{1,2})\s*[-–—:]\s*<@!?(\d+)>/g;
@@ -9,13 +8,11 @@ const MAX_MENSAGENS = 500;
  * Lê todas as mensagens do canal de aniversários e extrai a lista.
  * Se um utilizador aparecer mais de uma vez, prevalece a mensagem mais recente.
  * @param {import('discord.js').Client} client
+ * @param {string} canalId - canal de aniversários do servidor
  * @returns {Promise<{ userId: string, dia: number, mes: number }[]>}
  */
-async function lerAniversarios(client) {
-    const canal = await client.channels.fetch(config.BIRTHDAY_CHANNEL_ID);
-    if (!canal?.isTextBased()) {
-        throw new Error(`Birthday channel ${config.BIRTHDAY_CHANNEL_ID} not found or not a text channel`);
-    }
+async function lerAniversarios(client, canalId) {
+    const canal = await obterCanal(client, canalId, 'Birthday');
 
     const mensagens = [];
     let antes;
@@ -57,10 +54,10 @@ function fazAnosHoje(aniversario, hoje) {
         && hoje.dia === 28 && hoje.mes === 2 && !eBissexto(hoje.ano);
 }
 
-async function obterCanalGeral(client) {
-    const canal = await client.channels.fetch(config.GENERAL_CHANNEL_ID);
+async function obterCanal(client, canalId, nome) {
+    const canal = await client.channels.fetch(canalId).catch(() => null);
     if (!canal?.isTextBased()) {
-        throw new Error(`General channel ${config.GENERAL_CHANNEL_ID} not found or not a text channel`);
+        throw new Error(`${nome} channel ${canalId} not found or not a text channel`);
     }
     return canal;
 }
@@ -97,13 +94,13 @@ function mensagemResumoMensal(lista, hoje) {
  * Envia a lista de aniversários do mês. As menções não notificam ninguém,
  * cada pessoa já é mencionada no dia de anos.
  */
-async function enviarResumoMensal(client, lista, hoje) {
+async function enviarResumoMensal(client, cfg, lista, hoje) {
     const conteudo = mensagemResumoMensal(lista, hoje);
     if (!conteudo) {
         console.log('📅 No birthdays this month, skipping monthly summary');
         return;
     }
-    const canalGeral = await obterCanalGeral(client);
+    const canalGeral = await obterCanal(client, cfg.generalChannelId, 'General');
     await canalGeral.send({ content: conteudo, allowedMentions: { parse: [] } });
     console.log('📅 Monthly summary sent');
 }
@@ -111,17 +108,18 @@ async function enviarResumoMensal(client, lista, hoje) {
 /**
  * Envia os parabéns a quem faz anos hoje e ainda não os recebeu.
  * @param {import('discord.js').Client} client
+ * @param {import('./store').ConfigServidor} cfg
  * @param {{ userId: string, dia: number, mes: number }[]} lista
  * @param {{ dia: number, mes: number, ano: number }} hoje
  * @param {Set<string>} jaEnviados - IDs que já receberam mensagem hoje
  * @param {(userId: string) => void} aoEnviar - chamado após cada utilizador tratado
  */
-async function verificarAniversarios(client, lista, hoje, jaEnviados, aoEnviar) {
+async function verificarAniversarios(client, cfg, lista, hoje, jaEnviados, aoEnviar) {
     const aniversariantes = lista.filter((a) => fazAnosHoje(a, hoje) && !jaEnviados.has(a.userId));
     console.log(`🔍 ${lista.length} birthdays in the list, ${aniversariantes.length} to celebrate today`);
     if (aniversariantes.length === 0) return;
 
-    const canalGeral = await obterCanalGeral(client);
+    const canalGeral = await obterCanal(client, cfg.generalChannelId, 'General');
 
     for (const { userId } of aniversariantes) {
         try {
@@ -135,7 +133,7 @@ async function verificarAniversarios(client, lista, hoje, jaEnviados, aoEnviar) 
             throw error;
         }
 
-        const conteudo = config.BIRTHDAY_MESSAGE.replaceAll('{user}', `<@${userId}>`);
+        const conteudo = cfg.message.replaceAll('{user}', `<@${userId}>`);
         await canalGeral.send({ content: conteudo, allowedMentions: { users: [userId] } });
         console.log(`📢 Birthday message sent to ${userId}`);
         aoEnviar(userId);
@@ -144,6 +142,7 @@ async function verificarAniversarios(client, lista, hoje, jaEnviados, aoEnviar) 
 
 module.exports = {
     lerAniversarios,
+    obterCanal,
     fazAnosHoje,
     formatarData,
     nomeDoMes,

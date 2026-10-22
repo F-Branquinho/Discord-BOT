@@ -1,8 +1,8 @@
 const { EmbedBuilder, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes, SlashCommandBuilder } = require('discord.js');
 const config = require('./config');
+const store = require('./store');
 const { lerAniversarios, fazAnosHoje, formatarData, nomeDoMes, aniversariosDoMes } = require('./birthdays');
-const { agoraNoFuso } = require('./scheduler');
-const { lerEstado } = require('./state');
+const { agoraNoFuso, proximaVerificacao } = require('./scheduler');
 
 const DIAS_POR_MES = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const ARRANQUE_MS = Date.now();
@@ -37,22 +37,33 @@ const AJUDA = {
     'aniversario-help': 'Mostra esta ajuda.',
 };
 
+/** Link para adicionar o bot a um servidor (já escolhido, se guildId for dado). */
+function urlConvite(clientId, guildId) {
+    const url = new URL('https://discord.com/oauth2/authorize');
+    url.searchParams.set('client_id', clientId);
+    url.searchParams.set('scope', 'bot applications.commands');
+    url.searchParams.set('permissions', String(PERMISSOES_CONVITE));
+    if (guildId) {
+        url.searchParams.set('guild_id', guildId);
+        url.searchParams.set('disable_guild_select', 'true');
+    }
+    return url.toString();
+}
+
 /**
- * Regista os comandos no servidor do canal geral. Comandos de servidor ficam disponíveis logo,
+ * Regista os comandos num servidor. Comandos de servidor ficam disponíveis logo,
  * ao contrário dos globais.
- * @param {import('discord.js').Client} client
+ * @param {import('discord.js').Guild} guild
  */
-async function registarComandos(client) {
-    const canal = await client.channels.fetch(config.GENERAL_CHANNEL_ID);
+async function registarComandos(guild) {
     try {
-        await canal.guild.commands.set(definicoes);
-        console.log(`⌨ Slash commands registered in ${canal.guild.name}`);
+        await guild.commands.set(definicoes);
+        console.log(`⌨ Slash commands registered in ${guild.name}`);
     } catch (error) {
         if (error.code !== RESTJSONErrorCodes.MissingAccess) throw error;
         console.error(
-            '❌ Missing permission to register slash commands. Re-invite the bot with this link:\n'
-            + `   https://discord.com/oauth2/authorize?client_id=${client.user.id}`
-            + `&scope=bot+applications.commands&permissions=${PERMISSOES_CONVITE}`,
+            `❌ Missing permission to register slash commands in ${guild.name}. Re-invite the bot with this link:\n`
+            + `   ${urlConvite(guild.client.user.id, guild.id)}`,
         );
     }
 }
@@ -69,8 +80,28 @@ function formatarDuracao(ms) {
     return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} e ${partes.at(-1)}` : partes[0];
 }
 
+function linkPainel(guildId) {
+    return config.WEB_ENABLED ? `${config.PUBLIC_URL}/servidor/${guildId}` : null;
+}
+
+/** Responde que o servidor ainda não foi configurado e devolve null; senão devolve a configuração. */
+async function exigirConfig(interaction) {
+    const cfg = store.obterConfig(interaction.guildId);
+    if (cfg) return cfg;
+    const painel = linkPainel(interaction.guildId);
+    await interaction.reply({
+        content: '⚙ Este servidor ainda não está configurado.'
+            + (painel ? ` Um administrador pode configurá-lo aqui: ${painel}` : ' Pede ao dono do bot para o configurar.'),
+        flags: MessageFlags.Ephemeral,
+    });
+    return null;
+}
+
 /** @param {import('discord.js').ChatInputCommandInteraction} interaction */
 async function adicionar(interaction) {
+    const cfg = await exigirConfig(interaction);
+    if (!cfg) return;
+
     const texto = interaction.options.getString('data', true).trim();
     const match = /^(\d{1,2})\/(\d{1,2})$/.exec(texto);
     const dia = Number(match?.[1]);
@@ -92,13 +123,13 @@ async function adicionar(interaction) {
 
     await interaction.deferReply();
     const data = formatarData(dia, mes);
-    const atual = (await lerAniversarios(interaction.client)).find((a) => a.userId === alvo.id);
+    const atual = (await lerAniversarios(interaction.client, cfg.birthdayChannelId)).find((a) => a.userId === alvo.id);
     if (atual?.dia === dia && atual?.mes === mes) {
         return interaction.editReply({ content: `ℹ O aniversário de <@${alvo.id}> já está na lista: **${data}**.`, allowedMentions: SEM_PINGS });
     }
 
     // A lista vive no canal de aniversários; a mensagem mais recente de cada pessoa prevalece
-    const canal = await interaction.client.channels.fetch(config.BIRTHDAY_CHANNEL_ID);
+    const canal = await interaction.client.channels.fetch(cfg.birthdayChannelId);
     try {
         await canal.send({ content: `${data} - <@${alvo.id}>`, allowedMentions: SEM_PINGS });
     } catch (error) {
@@ -107,7 +138,7 @@ async function adicionar(interaction) {
         }
         throw error;
     }
-    console.log(`📝 Birthday ${atual ? 'updated' : 'added'} by ${interaction.user.tag}: ${data} - ${alvo.tag} (${alvo.id})`);
+    console.log(`📝 [${interaction.guild?.name}] Birthday ${atual ? 'updated' : 'added'} by ${interaction.user.tag}: ${data} - ${alvo.tag} (${alvo.id})`);
 
     const resposta = atual
         ? `✏ Aniversário de <@${alvo.id}> alterado de ${formatarData(atual.dia, atual.mes)} para **${data}**.`
@@ -117,38 +148,39 @@ async function adicionar(interaction) {
 
 /** @param {import('discord.js').ChatInputCommandInteraction} interaction */
 async function status(interaction) {
+    const cfg = await exigirConfig(interaction);
+    if (!cfg) return;
+
     await interaction.deferReply();
-    const lista = await lerAniversarios(interaction.client);
-    const estado = lerEstado();
-    const hoje = agoraNoFuso(config.TIMEZONE);
-    const feitaHoje = estado.data === hoje.data && estado.concluido;
+    const lista = await lerAniversarios(interaction.client, cfg.birthdayChannelId);
+    const estado = store.lerEstado(interaction.guildId);
 
     let ultima = 'ainda nenhuma';
     if (estado.data) ultima = `${estado.data.split('-').reverse().join('/')} ${estado.concluido ? '✅' : '⚠ incompleta'}`;
 
-    let proxima;
-    if (feitaHoje) proxima = `amanhã às ${config.CHECK_TIME} (${config.TIMEZONE})`;
-    else if (hoje.horaMinuto < config.CHECK_TIME) proxima = `hoje às ${config.CHECK_TIME} (${config.TIMEZONE})`;
-    else proxima = 'a decorrer, a tentar de novo de 5 em 5 min';
-
     const ping = interaction.client.ws.ping;
     const linhas = [
-        '🟢 **Bot de aniversários a correr**',
+        cfg.enabled ? '🟢 **Bot de aniversários a correr**' : '⏸ **Bot a correr, mas os parabéns estão desligados neste servidor**',
         `⏱ Online há **${formatarDuracao(Date.now() - ARRANQUE_MS)}** (desde <t:${Math.floor(ARRANQUE_MS / 1000)}:f>)`,
         `📋 ${lista.length} aniversários na lista`,
         `🔍 Última verificação: ${ultima}`,
-        `⏰ Próxima verificação: ${proxima}`,
-        `📅 Resumo mensal: ${config.MONTHLY_SUMMARY ? 'ligado (dia 1)' : 'desligado'}`,
+        `⏰ Próxima verificação: ${proximaVerificacao(interaction.guildId, cfg)}`,
+        `📅 Resumo mensal: ${cfg.monthlySummary ? 'ligado (dia 1)' : 'desligado'}`,
     ];
     if (ping >= 0) linhas.push(`📶 Ping: ${ping} ms`);
+    const painel = linkPainel(interaction.guildId);
+    if (painel) linhas.push(`⚙ Painel: ${painel}`);
     return interaction.editReply(linhas.join('\n'));
 }
 
 /** @param {import('discord.js').ChatInputCommandInteraction} interaction */
 async function proximos(interaction) {
+    const cfg = await exigirConfig(interaction);
+    if (!cfg) return;
+
     await interaction.deferReply();
-    const hoje = agoraNoFuso(config.TIMEZONE);
-    const doMes = aniversariosDoMes(await lerAniversarios(interaction.client), hoje.mes);
+    const hoje = agoraNoFuso(cfg.timezone);
+    const doMes = aniversariosDoMes(await lerAniversarios(interaction.client, cfg.birthdayChannelId), hoje.mes);
     if (doMes.length === 0) {
         return interaction.editReply(`📅 Ninguém faz anos em ${nomeDoMes(hoje.mes)}.`);
     }
@@ -167,11 +199,21 @@ async function proximos(interaction) {
 
 /** @param {import('discord.js').ChatInputCommandInteraction} interaction */
 async function ajuda(interaction) {
-    const funcionamento = [
-        `🎉 Todos os dias às **${config.CHECK_TIME}** (${config.TIMEZONE}) dou os parabéns em <#${config.GENERAL_CHANNEL_ID}> a quem faz anos.`,
-        `📋 A lista está em <#${config.BIRTHDAY_CHANNEL_ID}>, uma linha por pessoa: \`25/12 - @pessoa\`.`,
-    ];
-    if (config.MONTHLY_SUMMARY) funcionamento.push('📅 No dia 1 de cada mês publico a lista dos aniversários desse mês.');
+    const cfg = store.obterConfig(interaction.guildId);
+    const painel = linkPainel(interaction.guildId);
+
+    const funcionamento = [];
+    if (cfg) {
+        funcionamento.push(
+            `🎉 Todos os dias às **${cfg.checkTime}** (${cfg.timezone}) dou os parabéns em <#${cfg.generalChannelId}> a quem faz anos.`,
+            `📋 A lista está em <#${cfg.birthdayChannelId}>, uma linha por pessoa: \`25/12 - @pessoa\`.`,
+        );
+        if (cfg.monthlySummary) funcionamento.push('📅 No dia 1 de cada mês publico a lista dos aniversários desse mês.');
+        if (!cfg.enabled) funcionamento.push('⏸ Os parabéns estão desligados neste servidor.');
+    } else {
+        funcionamento.push('⚙ Este servidor ainda não está configurado.');
+    }
+    if (painel) funcionamento.push(`🔧 Os administradores configuram o bot em ${painel}`);
 
     const embed = new EmbedBuilder()
         .setColor(0xf47fff)
@@ -191,7 +233,7 @@ const handlers = {
 
 /** @param {import('discord.js').Interaction} interaction */
 async function tratarInteracao(interaction) {
-    if (!interaction.isChatInputCommand()) return;
+    if (!interaction.isChatInputCommand() || !interaction.inGuild()) return;
     const handler = handlers[interaction.commandName];
     if (!handler) return;
 
@@ -208,4 +250,4 @@ async function tratarInteracao(interaction) {
     }
 }
 
-module.exports = { AJUDA, definicoes, formatarDuracao, registarComandos, tratarInteracao };
+module.exports = { AJUDA, definicoes, formatarDuracao, registarComandos, tratarInteracao, urlConvite };

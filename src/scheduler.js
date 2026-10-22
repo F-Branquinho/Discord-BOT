@@ -1,12 +1,11 @@
 const cron = require('node-cron');
-const config = require('./config');
 const { lerAniversarios, enviarResumoMensal, verificarAniversarios } = require('./birthdays');
-const { lerEstado, guardarEstado } = require('./state');
+const store = require('./store');
 
 const ESPERA_APOS_ERRO_MS = 5 * 60 * 1000;
 
 /**
- * Data e hora atuais no fuso horário configurado.
+ * Data e hora atuais no fuso horário indicado.
  */
 function agoraNoFuso(timeZone) {
     const partes = Object.fromEntries(
@@ -25,64 +24,89 @@ function agoraNoFuso(timeZone) {
     };
 }
 
-let aCorrer = false;
+const aCorrer = new Set();
+const proximaTentativa = new Map();
 
 /**
- * Faz a verificação de hoje, se ainda não foi feita. Como o estado fica em disco,
- * reinícios do contentor não duplicam mensagens. Em caso de erro, tenta de novo daqui a 5 min.
+ * Faz a verificação de hoje de um servidor. Como o estado fica em disco,
+ * reinícios não duplicam mensagens. Em caso de erro, tenta de novo daqui a 5 min.
  * @param {import('discord.js').Client} client
+ * @param {string} guildId
+ * @param {import('./store').ConfigServidor} cfg
  */
-async function executarVerificacao(client) {
-    if (aCorrer) return;
+async function verificarServidor(client, guildId, cfg) {
+    const agora = agoraNoFuso(cfg.timezone);
+    const estado = store.lerEstado(guildId);
+    const nome = client.guilds.cache.get(guildId)?.name ?? guildId;
 
-    const agora = agoraNoFuso(config.TIMEZONE);
-    const estado = lerEstado();
-    if (estado.data === agora.data && estado.concluido) return;
-
-    aCorrer = true;
+    aCorrer.add(guildId);
     const enviados = new Set(estado.data === agora.data ? estado.enviados : []);
     const mesAtual = agora.data.slice(0, 7);
-    let resumo = estado.resumo ?? null; // último mês (AAAA-MM) com resumo enviado
-    const guardar = (concluido) => guardarEstado({ data: agora.data, enviados: [...enviados], concluido, resumo });
+    let { resumo } = estado; // último mês (AAAA-MM) com resumo enviado
+    const guardar = (concluido) => store.guardarEstado(guildId, { data: agora.data, enviados: [...enviados], concluido, resumo });
 
     try {
-        console.log(`🎂 Checking birthdays for ${agora.data}...`);
-        const lista = await lerAniversarios(client);
+        console.log(`🎂 [${nome}] Checking birthdays for ${agora.data}...`);
+        const lista = await lerAniversarios(client, cfg.birthdayChannelId);
 
-        if (config.MONTHLY_SUMMARY && agora.dia === 1 && resumo !== mesAtual) {
-            await enviarResumoMensal(client, lista, agora);
+        if (cfg.monthlySummary && agora.dia === 1 && resumo !== mesAtual) {
+            await enviarResumoMensal(client, cfg, lista, agora);
             resumo = mesAtual;
             guardar(false);
         }
 
-        await verificarAniversarios(client, lista, agora, enviados, (userId) => {
+        await verificarAniversarios(client, cfg, lista, agora, enviados, (userId) => {
             enviados.add(userId);
             guardar(false);
         });
         guardar(true);
-        console.log('✅ Check complete');
+        proximaTentativa.delete(guildId);
+        console.log(`✅ [${nome}] Check complete`);
     } catch (error) {
-        console.error(`❌ Check failed, retrying in ${ESPERA_APOS_ERRO_MS / 60000} min:`, error);
-        setTimeout(() => executarVerificacao(client), ESPERA_APOS_ERRO_MS);
+        console.error(`❌ [${nome}] Check failed, retrying in ${ESPERA_APOS_ERRO_MS / 60000} min:`, error);
+        proximaTentativa.set(guildId, Date.now() + ESPERA_APOS_ERRO_MS);
     } finally {
-        aCorrer = false;
+        aCorrer.delete(guildId);
     }
 }
 
 /**
- * Agenda a verificação diária para CHECK_TIME no fuso TIMEZONE.
- * Se o bot arrancar depois dessa hora e a verificação de hoje ainda não tiver sido feita
- * (ex: estava em baixo às 00:01), faz logo.
- * @param {import('discord.js').Client} client
+ * Corre a verificação de cada servidor que já passou a sua hora e ainda não foi verificado hoje.
+ * Também apanha o dia de hoje se o bot esteve em baixo à hora marcada.
  */
-function iniciarAgendador(client) {
-    const [hora, minuto] = config.CHECK_TIME.split(':').map(Number);
-    cron.schedule(`${minuto} ${hora} * * *`, () => executarVerificacao(client), { timezone: config.TIMEZONE });
-    console.log(`⏰ Daily check scheduled for ${config.CHECK_TIME} (${config.TIMEZONE})`);
+function tick(client) {
+    for (const [guildId, cfg] of store.servidoresConfigurados()) {
+        if (!cfg.enabled || !client.guilds.cache.has(guildId) || aCorrer.has(guildId)) continue;
+        if (Date.now() < (proximaTentativa.get(guildId) ?? 0)) continue;
 
-    if (agoraNoFuso(config.TIMEZONE).horaMinuto >= config.CHECK_TIME) {
-        executarVerificacao(client);
+        const agora = agoraNoFuso(cfg.timezone);
+        if (agora.horaMinuto < cfg.checkTime) continue;
+        const estado = store.lerEstado(guildId);
+        if (estado.data === agora.data && estado.concluido) continue;
+
+        verificarServidor(client, guildId, cfg);
     }
 }
 
-module.exports = { agoraNoFuso, iniciarAgendador };
+/**
+ * Cada servidor tem a sua hora e fuso, por isso o cron corre de minuto a minuto
+ * e o tick decide que servidores já chegaram à hora.
+ * @param {import('discord.js').Client} client
+ */
+function iniciarAgendador(client) {
+    cron.schedule('* * * * *', () => tick(client));
+    console.log(`⏰ Scheduler started (${store.servidoresConfigurados().length} configured servers)`);
+    tick(client);
+}
+
+/** Estado da próxima verificação de um servidor, para o /aniversario-status e o painel. */
+function proximaVerificacao(guildId, cfg) {
+    const agora = agoraNoFuso(cfg.timezone);
+    const estado = store.lerEstado(guildId);
+    if (!cfg.enabled) return 'desligada';
+    if (estado.data === agora.data && estado.concluido) return `amanhã às ${cfg.checkTime} (${cfg.timezone})`;
+    if (agora.horaMinuto < cfg.checkTime) return `hoje às ${cfg.checkTime} (${cfg.timezone})`;
+    return 'a decorrer, a tentar de novo de 5 em 5 min';
+}
+
+module.exports = { agoraNoFuso, iniciarAgendador, proximaVerificacao };
