@@ -4,7 +4,7 @@ const config = require('./config');
 const store = require('./store');
 
 /**
- * Configuração antiga do .env (um só servidor), ou null se não existir.
+ * Old single-server configuration from .env, or null if there is none.
  * @param {import('discord.js').Client} client
  */
 async function configAntiga(client) {
@@ -20,12 +20,14 @@ async function configAntiga(client) {
             ...store.configPorOmissao(),
             birthdayChannelId: config.LEGACY_BIRTHDAY_CHANNEL_ID,
             generalChannelId: config.LEGACY_GENERAL_CHANNEL_ID,
+            // Versions before BOT_LANGUAGE existed always posted in Portuguese
+            language: config.LANGUAGE_SET ? config.DEFAULT_LANGUAGE : 'pt',
         },
     };
 }
 
 /**
- * Passa a configuração antiga do .env e o estado.json para o guilds.json, uma única vez.
+ * Moves the old .env configuration and estado.json into guilds.json, once.
  * @param {import('discord.js').Client} client
  */
 async function migrarConfigAntiga(client) {

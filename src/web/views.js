@@ -1,4 +1,4 @@
-// Páginas do painel, em HTML simples gerado no servidor (sem JavaScript no browser)
+// Panel pages, as plain server-rendered HTML (no JavaScript in the browser)
 
 function esc(valor) {
     return String(valor ?? '')
@@ -74,7 +74,7 @@ textarea { min-height: 80px; resize: vertical; }
 
 function layout(titulo, corpo) {
     return `<!doctype html>
-<html lang="pt">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -93,7 +93,7 @@ function cabecalho(sessao) {
   </div>
   <form method="post" action="/logout">
     <input type="hidden" name="csrf" value="${esc(sessao.csrf)}">
-    <button class="botao secundario" type="submit">Sair</button>
+    <button class="botao secundario" type="submit">Log out</button>
   </form>
 </header>`;
 }
@@ -104,12 +104,12 @@ function alertas(tipo, mensagens) {
 }
 
 function paginaInicial({ bot }) {
-    return layout('Bot de aniversários', `
+    return layout('Birthday bot', `
 <div class="cartao centro">
   <img class="avatar" src="${avatarUtilizador(bot.id, bot.avatar)}" alt="">
   <h1>${esc(bot.username)}</h1>
-  <p class="suave">Dá os parabéns aos membros do teu servidor no dia de anos e publica a lista do mês no dia 1.</p>
-  <p><a class="botao" href="/login">Entrar com Discord</a></p>
+  <p class="suave">Wishes your server members a happy birthday on their day and posts the month's birthdays on the 1st.</p>
+  <p><a class="botao" href="/login">Log in with Discord</a></p>
 </div>`);
 }
 
@@ -118,13 +118,13 @@ function paginaServidores({ sessao, servidores }) {
         let estado;
         let acao;
         if (!s.temBot) {
-            estado = '<span class="etiqueta suave">Bot não adicionado</span>';
-            acao = `<a class="botao secundario" href="${esc(s.convite)}">Adicionar bot</a>`;
+            estado = '<span class="etiqueta suave">Bot not added</span>';
+            acao = `<a class="botao secundario" href="${esc(s.convite)}">Add bot</a>`;
         } else {
             estado = s.configurado
-                ? '<span class="etiqueta ok">● Configurado</span>'
-                : '<span class="etiqueta aviso">● Por configurar</span>';
-            acao = `<a class="botao" href="/servidor/${esc(s.id)}">Configurar</a>`;
+                ? '<span class="etiqueta ok">● Set up</span>'
+                : '<span class="etiqueta aviso">● Not set up yet</span>';
+            acao = `<a class="botao" href="/server/${esc(s.id)}">Set up</a>`;
         }
         return `<div class="cartao servidor">
   ${iconeServidor(s.id, s.nome, s.icon)}
@@ -133,21 +133,21 @@ function paginaServidores({ sessao, servidores }) {
 </div>`;
     }).join('');
 
-    const vazio = `<div class="cartao"><p>Não tens a permissão <strong>Gerir servidor</strong> em nenhum servidor.</p></div>`;
-    return layout('Os teus servidores', `
+    const vazio = `<div class="cartao"><p>You don't have the <strong>Manage Server</strong> permission in any server.</p></div>`;
+    return layout('Your servers', `
 ${cabecalho(sessao)}
-<h1>Os teus servidores</h1>
-<p class="suave">Servidores onde tens a permissão Gerir servidor. Depois de adicionares o bot a um servidor, <a href="/login">atualiza a lista</a>.</p>
+<h1>Your servers</h1>
+<p class="suave">Servers where you have the Manage Server permission. After adding the bot to a server, <a href="/login">refresh the list</a>.</p>
 ${servidores.length ? itens : vazio}`);
 }
 
 function opcoesCanais(canais, selecionado) {
-    const opcoes = ['<option value="">Escolhe um canal…</option>'];
+    const opcoes = ['<option value="">Choose a channel…</option>'];
     let categoria;
     for (const c of canais) {
         if (c.categoria !== categoria) {
             if (categoria !== undefined) opcoes.push('</optgroup>');
-            opcoes.push(`<optgroup label="${esc(c.categoria ?? 'Sem categoria')}">`);
+            opcoes.push(`<optgroup label="${esc(c.categoria ?? 'No category')}">`);
             categoria = c.categoria;
         }
         opcoes.push(`<option value="${esc(c.id)}"${c.id === selecionado ? ' selected' : ''}>#${esc(c.nome)}</option>`);
@@ -156,72 +156,77 @@ function opcoesCanais(canais, selecionado) {
     return opcoes.join('');
 }
 
-function paginaServidor({ sessao, guild, canais, fusos, cfg, erros, avisos, guardado, resumo }) {
+function paginaServidor({ sessao, guild, canais, fusos, idiomas, cfg, erros, avisos, guardado, resumo }) {
     let cartaoResumo = '';
     if (resumo) {
         const doMes = resumo.doMes.length
             ? `<ul class="lista">${resumo.doMes.map((a) => `<li>${esc(a.data)} - ${esc(a.nome)}</li>`).join('')}</ul>`
-            : '<p class="suave">Ninguém faz anos este mês.</p>';
+            : '<p class="suave">Nobody has a birthday this month.</p>';
         cartaoResumo = `<div class="cartao">
-  <h2>Estado</h2>
-  ${resumo.erroLista ? alertas('erro', [resumo.erroLista]) : `<p>📋 ${resumo.total} aniversários na lista</p>`}
-  <p>🔍 Última verificação: ${esc(resumo.ultima)}<br>⏰ Próxima verificação: ${esc(resumo.proxima)}</p>
+  <h2>Status</h2>
+  ${resumo.erroLista ? alertas('erro', [resumo.erroLista]) : `<p>📋 ${resumo.total} birthdays on the list</p>`}
+  <p>🔍 Last check: ${esc(resumo.ultima)}<br>⏰ Next check: ${esc(resumo.proxima)}</p>
   <h2>${esc(resumo.nomeMes)}</h2>
   ${doMes}
 </div>`;
     }
 
-    return layout(`${guild.name}: configuração`, `
+    return layout(`${guild.name}: settings`, `
 ${cabecalho(sessao)}
-<p><a href="/">← Os teus servidores</a></p>
+<p><a href="/">← Your servers</a></p>
 <div class="servidor" style="margin-bottom:16px">
   ${iconeServidor(guild.id, guild.name, guild.icon)}
   <h1 class="nome" style="margin:0">${esc(guild.name)}</h1>
 </div>
-${guardado ? alertas('ok', ['Configuração guardada.']) : ''}
+${guardado ? alertas('ok', ['Settings saved.']) : ''}
 ${alertas('erro', erros)}
 ${alertas('aviso', avisos)}
 ${cartaoResumo}
-<form class="cartao" method="post" action="/servidor/${esc(guild.id)}">
+<form class="cartao" method="post" action="/server/${esc(guild.id)}">
   <input type="hidden" name="csrf" value="${esc(sessao.csrf)}">
-  <h2>Configuração</h2>
+  <h2>Settings</h2>
 
-  <label for="birthdayChannelId">Canal com a lista de aniversários</label>
+  <label for="birthdayChannelId">Birthday list channel</label>
   <select id="birthdayChannelId" name="birthdayChannelId" required>${opcoesCanais(canais, cfg.birthdayChannelId)}</select>
-  <div class="ajuda">Uma linha por pessoa, ex: <code>25/12 - @pessoa</code>. O /aniversario-adicionar escreve aqui.</div>
+  <div class="ajuda">One line per person, e.g. <code>25/12 - @person</code>. /birthday-add writes here.</div>
 
-  <label for="generalChannelId">Canal onde enviar os parabéns</label>
+  <label for="generalChannelId">Channel for birthday messages</label>
   <select id="generalChannelId" name="generalChannelId" required>${opcoesCanais(canais, cfg.generalChannelId)}</select>
 
   <div class="grelha">
     <div>
-      <label for="checkTime">Hora da verificação diária</label>
+      <label for="checkTime">Daily check time</label>
       <input id="checkTime" name="checkTime" type="time" value="${esc(cfg.checkTime)}" required>
     </div>
     <div>
-      <label for="timezone">Fuso horário</label>
+      <label for="timezone">Timezone</label>
       <input id="timezone" name="timezone" type="text" list="fusos" value="${esc(cfg.timezone)}" required>
       <datalist id="fusos">${fusos.map((f) => `<option value="${esc(f)}">`).join('')}</datalist>
     </div>
   </div>
 
-  <label for="message">Mensagem de parabéns</label>
-  <textarea id="message" name="message" maxlength="1500" required>${esc(cfg.message)}</textarea>
-  <div class="ajuda"><code>{user}</code> é substituído pela menção ao aniversariante.</div>
+  <label for="language">Message language</label>
+  <select id="language" name="language" required>${Object.entries(idiomas).map(([codigo, i]) => `<option value="${esc(codigo)}"${codigo === cfg.language ? ' selected' : ''}>${esc(i.nome)}</option>`).join('')}</select>
+  <div class="ajuda">Language of the birthday message and the monthly summary posted in this server.</div>
 
-  <label class="caixa"><input type="checkbox" name="monthlySummary"${cfg.monthlySummary ? ' checked' : ''}> Publicar a lista do mês no dia 1</label>
-  <label class="caixa"><input type="checkbox" name="enabled"${cfg.enabled ? ' checked' : ''}> Parabéns ligados neste servidor</label>
+  <label for="message">Custom birthday message (optional)</label>
+  <textarea id="message" name="message" maxlength="1500" placeholder="${esc(idiomas[cfg.language]?.mensagemAniversario)}">${esc(cfg.message)}</textarea>
+  <div class="ajuda"><code>{user}</code> is replaced by the birthday person's mention. Leave empty to use the default for the chosen language:
+    <ul class="lista">${Object.values(idiomas).map((i) => `<li>${esc(i.nome)}: ${esc(i.mensagemAniversario)}</li>`).join('')}</ul></div>
 
-  <p style="margin-top:20px"><button class="botao" type="submit">Guardar</button></p>
+  <label class="caixa"><input type="checkbox" name="monthlySummary"${cfg.monthlySummary ? ' checked' : ''}> Post the month's birthdays on the 1st</label>
+  <label class="caixa"><input type="checkbox" name="enabled"${cfg.enabled ? ' checked' : ''}> Birthday messages turned on in this server</label>
+
+  <p style="margin-top:20px"><button class="botao" type="submit">Save</button></p>
 </form>`);
 }
 
-function paginaErro(mensagem, { estado = 'Erro', link = '/' } = {}) {
+function paginaErro(mensagem, { estado = 'Error', link = '/' } = {}) {
     return layout(estado, `
 <div class="cartao centro">
   <h1>${esc(estado)}</h1>
   <p>${esc(mensagem)}</p>
-  <p><a class="botao" href="${esc(link)}">Voltar</a></p>
+  <p><a class="botao" href="${esc(link)}">Back</a></p>
 </div>`);
 }
 

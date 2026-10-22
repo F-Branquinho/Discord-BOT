@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Instala o Cloudflare Tunnel (cloudflared) como serviço systemd. Correr como root,
-# no LXC do bot ou num LXC só para o túnel (que pode servir outros serviços do homelab).
+# Installs Cloudflare Tunnel (cloudflared) as a systemd service. Run as root,
+# in the bot's LXC or in an LXC just for the tunnel (which can serve other homelab services too).
 #
-# O token vem do painel Cloudflare Zero Trust: Networks → Tunnels → Create a tunnel → Cloudflared.
-# Pode ser passado em CLOUDFLARE_TUNNEL_TOKEN; senão é pedido. Também aceita o comando
-# "cloudflared service install <token>" colado inteiro.
+# The token comes from Cloudflare Zero Trust: Networks → Tunnels → Create a tunnel → Cloudflared.
+# It can be passed in CLOUDFLARE_TUNNEL_TOKEN; otherwise it is asked for. The whole
+# "cloudflared service install <token>" command can be pasted too.
 set -euo pipefail
 
 export LANG=C.UTF-8 LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive

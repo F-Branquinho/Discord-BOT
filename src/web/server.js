@@ -3,8 +3,9 @@ const express = require('express');
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const config = require('../config');
 const store = require('../store');
+const { IDIOMAS } = require('../i18n');
 const { lerAniversarios, formatarData, nomeDoMes, aniversariosDoMes } = require('../birthdays');
-const { agoraNoFuso, proximaVerificacao } = require('../scheduler');
+const { agoraNoFuso, proximaVerificacao, ultimaVerificacao } = require('../scheduler');
 const { urlConvite } = require('../commands');
 const views = require('./views');
 
@@ -16,7 +17,7 @@ const TIPOS_TEXTO = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 const FUSOS = Intl.supportedValuesOf('timeZone');
 const { ViewChannel, SendMessages, ReadMessageHistory, ManageGuild, Administrator } = PermissionFlagsBits;
 
-// Sessões em memória: um reinício do bot obriga a entrar outra vez, o que não faz mal
+// Sessions live in memory: a bot restart just means logging in again
 const sessoes = new Map();
 
 function lerCookies(req) {
@@ -58,7 +59,7 @@ function exigirSessao(req, res, next) {
 
 function exigirCsrf(req, res, next) {
     if (!iguais(req.body?.csrf, req.sessao?.csrf)) {
-        return res.status(403).send(views.paginaErro('O formulário expirou. Recarrega a página e tenta outra vez.'));
+        return res.status(403).send(views.paginaErro('This form has expired. Reload the page and try again.'));
     }
     next();
 }
@@ -70,8 +71,8 @@ async function apiDiscord(caminho, accessToken) {
 }
 
 /**
- * Devolve o servidor se o utilizador lá tiver Gerir servidor. A permissão é confirmada pelo bot
- * no momento, não só a partir do login, para que tirar a permissão a alguém tenha efeito imediato.
+ * Returns the server if the user has Manage Server there. The bot checks the permission on
+ * every request, not just at login, so removing someone's permission takes effect right away.
  */
 async function servidorGerivel(client, guildId, userId) {
     const guild = client.guilds.cache.get(guildId);
@@ -87,7 +88,7 @@ function canaisDeTexto(guild) {
         .map((c) => ({ id: c.id, nome: c.name, categoria: c.parent?.name ?? null }));
 }
 
-/** Permissões que faltam ao bot nos canais escolhidos: erros impedem de guardar, avisos não. */
+/** Permissions the bot is missing in the chosen channels: errors block saving, warnings don't. */
 function verificarPermissoes(guild, cfg) {
     const erros = [];
     const avisos = [];
@@ -95,11 +96,11 @@ function verificarPermissoes(guild, cfg) {
         const canal = guild.channels.cache.get(canalId);
         const tem = canal?.permissionsFor(guild.members.me);
         const faltam = necessarias.filter(([p]) => !tem?.has(p)).map(([, nome]) => nome);
-        if (canal && faltam.length) lista.push(`No canal #${canal.name} (${papel}) falta-me: ${faltam.join(', ')}.`);
+        if (canal && faltam.length) lista.push(`In #${canal.name} (${papel}) I'm missing: ${faltam.join(', ')}.`);
     };
-    verificar(cfg.birthdayChannelId, 'lista', [[ViewChannel, 'Ver canal'], [ReadMessageHistory, 'Ler histórico de mensagens']], erros);
-    verificar(cfg.birthdayChannelId, 'lista', [[SendMessages, 'Enviar mensagens (para o /aniversario-adicionar)']], avisos);
-    verificar(cfg.generalChannelId, 'parabéns', [[ViewChannel, 'Ver canal'], [SendMessages, 'Enviar mensagens']], erros);
+    verificar(cfg.birthdayChannelId, 'birthday list', [[ViewChannel, 'View Channel'], [ReadMessageHistory, 'Read Message History']], erros);
+    verificar(cfg.birthdayChannelId, 'birthday list', [[SendMessages, 'Send Messages (for /birthday-add)']], avisos);
+    verificar(cfg.generalChannelId, 'birthday messages', [[ViewChannel, 'View Channel'], [SendMessages, 'Send Messages']], erros);
     return { erros, avisos };
 }
 
@@ -107,13 +108,12 @@ async function resumoServidor(client, guild) {
     const cfg = store.obterConfig(guild.id);
     if (!cfg) return null;
 
-    const estado = store.lerEstado(guild.id);
     const hoje = agoraNoFuso(cfg.timezone);
     const resumo = {
         total: 0,
         doMes: [],
-        nomeMes: `Aniversários de ${nomeDoMes(hoje.mes)}`,
-        ultima: estado.data ? `${estado.data.split('-').reverse().join('/')} ${estado.concluido ? '✅' : '⚠ incompleta'}` : 'ainda nenhuma',
+        nomeMes: `Birthdays in ${nomeDoMes(hoje.mes)}`,
+        ultima: ultimaVerificacao(guild.id),
         proxima: proximaVerificacao(guild.id, cfg),
         erroLista: null,
     };
@@ -125,7 +125,7 @@ async function resumoServidor(client, guild) {
             resumo.doMes.push({ data: formatarData(a.dia, a.mes), nome: user?.globalName ?? user?.username ?? a.userId });
         }
     } catch (error) {
-        resumo.erroLista = `Não consegui ler o canal da lista: ${error.message}`;
+        resumo.erroLista = `Couldn't read the birthday list channel: ${error.message}`;
     }
     return resumo;
 }
@@ -137,6 +137,7 @@ async function renderServidor(client, guild, sessao, { cfg, erros = [], avisos =
         guild,
         canais: canaisDeTexto(guild),
         fusos: FUSOS,
+        idiomas: IDIOMAS,
         cfg: atual,
         erros,
         avisos: [...avisos, ...(cfg ? [] : verificarPermissoes(guild, atual).avisos)],
@@ -164,8 +165,8 @@ function iniciarPainel(client) {
     });
     app.use(express.urlencoded({ extended: false, limit: '20kb' }));
 
-    app.get('/saude', (req, res) => {
-        res.status(client.isReady() ? 200 : 503).type('text').send(client.isReady() ? 'ok' : 'a arrancar');
+    app.get('/health', (req, res) => {
+        res.status(client.isReady() ? 200 : 503).type('text').send(client.isReady() ? 'ok' : 'starting');
     });
 
     app.get('/', (req, res) => {
@@ -203,7 +204,7 @@ function iniciarPainel(client) {
             const { code, state } = req.query;
             definirCookie(res, COOKIE_ESTADO, '', 0);
             if (typeof code !== 'string' || !iguais(state, lerCookies(req)[COOKIE_ESTADO])) {
-                return res.status(400).send(views.paginaErro('O login foi cancelado ou expirou. Tenta outra vez.', { link: '/login' }));
+                return res.status(400).send(views.paginaErro('The login was cancelled or expired. Please try again.', { link: '/login' }));
             }
 
             const resposta = await fetch(`${API}/oauth2/token`, {
@@ -251,26 +252,26 @@ function iniciarPainel(client) {
         res.redirect('/');
     });
 
-    // Responde quando o utilizador não pode gerir o servidor; manda adicionar o bot se ele lá não estiver
+    // Used when the user can't manage the server; sends them to add the bot if it isn't there
     function negar(req, res) {
         const { id } = req.params;
         if (!client.guilds.cache.has(id) && req.sessao.guilds.some((g) => g.id === id)) {
             return res.redirect(urlConvite(client.user.id, id));
         }
-        return res.status(403).send(views.paginaErro('Não tens a permissão Gerir servidor neste servidor.', { estado: 'Sem acesso' }));
+        return res.status(403).send(views.paginaErro("You don't have the Manage Server permission in this server.", { estado: 'No access' }));
     }
 
-    app.get('/servidor/:id', exigirSessao, async (req, res, next) => {
+    app.get('/server/:id', exigirSessao, async (req, res, next) => {
         try {
             const guild = await servidorGerivel(client, req.params.id, req.sessao.userId);
             if (!guild) return negar(req, res);
-            res.send(await renderServidor(client, guild, req.sessao, { guardado: req.query.guardado === '1' }));
+            res.send(await renderServidor(client, guild, req.sessao, { guardado: req.query.saved === '1' }));
         } catch (error) {
             next(error);
         }
     });
 
-    app.post('/servidor/:id', exigirSessao, exigirCsrf, async (req, res, next) => {
+    app.post('/server/:id', exigirSessao, exigirCsrf, async (req, res, next) => {
         try {
             const guild = await servidorGerivel(client, req.params.id, req.sessao.userId);
             if (!guild) return negar(req, res);
@@ -281,19 +282,21 @@ function iniciarPainel(client) {
                 generalChannelId: campo('generalChannelId'),
                 timezone: campo('timezone'),
                 checkTime: campo('checkTime'),
-                message: campo('message').replaceAll('\r\n', '\n'),
+                language: campo('language'),
+                message: campo('message').replaceAll('\r\n', '\n') || null,
                 monthlySummary: req.body.monthlySummary === 'on',
                 enabled: req.body.enabled === 'on',
             };
 
             const canais = new Set(canaisDeTexto(guild).map((c) => c.id));
             const erros = [];
-            if (!canais.has(cfg.birthdayChannelId)) erros.push('Escolhe o canal com a lista de aniversários.');
-            if (!canais.has(cfg.generalChannelId)) erros.push('Escolhe o canal onde enviar os parabéns.');
-            if (!config.horaValida(cfg.checkTime)) erros.push('A hora tem de estar no formato HH:MM.');
-            if (!config.fusoValido(cfg.timezone)) erros.push(`"${cfg.timezone}" não é um fuso horário válido (ex: Europe/Lisbon).`);
-            if (!cfg.message || cfg.message.length > 1500) erros.push('A mensagem tem de ter entre 1 e 1500 caracteres.');
-            else if (!cfg.message.includes('{user}')) erros.push('A mensagem tem de incluir {user}, que é substituído pela menção ao aniversariante.');
+            if (!canais.has(cfg.birthdayChannelId)) erros.push('Choose the birthday list channel.');
+            if (!canais.has(cfg.generalChannelId)) erros.push('Choose the channel for birthday messages.');
+            if (!config.horaValida(cfg.checkTime)) erros.push('The time must be in HH:MM format.');
+            if (!config.fusoValido(cfg.timezone)) erros.push(`"${cfg.timezone}" isn't a valid timezone (e.g. Europe/Lisbon).`);
+            if (!IDIOMAS[cfg.language]) erros.push('Choose a message language.');
+            if (cfg.message && cfg.message.length > 1500) erros.push('The message can be at most 1500 characters.');
+            else if (cfg.message && !cfg.message.includes('{user}')) erros.push('The message must include {user}, which is replaced by the birthday person\'s mention.');
 
             const permissoes = erros.length ? { erros: [], avisos: [] } : verificarPermissoes(guild, cfg);
             erros.push(...permissoes.erros);
@@ -303,23 +306,23 @@ function iniciarPainel(client) {
 
             store.guardarConfig(guild.id, cfg);
             console.log(`⚙ [${guild.name}] Configuration saved by ${req.sessao.nome} (${req.sessao.userId})`);
-            res.redirect(`/servidor/${guild.id}?guardado=1`);
+            res.redirect(`/server/${guild.id}?saved=1`);
         } catch (error) {
             next(error);
         }
     });
 
     app.use((req, res) => {
-        res.status(404).send(views.paginaErro('Esta página não existe.', { estado: 'Não encontrado' }));
+        res.status(404).send(views.paginaErro("This page doesn't exist.", { estado: 'Not found' }));
     });
 
     // eslint-disable-next-line no-unused-vars
     app.use((error, req, res, next) => {
         console.error('❌ Panel error:', error);
-        res.status(500).send(views.paginaErro('Ocorreu um erro. Tenta outra vez daqui a pouco.'));
+        res.status(500).send(views.paginaErro('Something went wrong. Please try again in a moment.'));
     });
 
-    // Limpar sessões expiradas de hora a hora
+    // Clear expired sessions every hour
     setInterval(() => {
         for (const [id, s] of sessoes) if (s.expira < Date.now()) sessoes.delete(id);
     }, 60 * 60 * 1000).unref();

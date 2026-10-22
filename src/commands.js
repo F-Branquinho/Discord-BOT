@@ -2,43 +2,44 @@ const { EmbedBuilder, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes, Sla
 const { version } = require('../package.json');
 const config = require('./config');
 const store = require('./store');
+const { idioma } = require('./i18n');
 const { lerAniversarios, fazAnosHoje, formatarData, nomeDoMes, aniversariosDoMes } = require('./birthdays');
-const { agoraNoFuso, proximaVerificacao } = require('./scheduler');
+const { agoraNoFuso, proximaVerificacao, ultimaVerificacao } = require('./scheduler');
 
 const DIAS_POR_MES = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const ARRANQUE_MS = Date.now();
-// Ver canais, enviar mensagens, ler histórico
+// View channels, send messages, read message history
 const PERMISSOES_CONVITE = 68608;
-// Menções aparecem com o nome mas não notificam ninguém
+// Mentions show the name but don't notify anyone
 const SEM_PINGS = { parse: [] };
 
 const definicoes = [
     new SlashCommandBuilder()
-        .setName('aniversario-adicionar')
-        .setDescription('Adiciona ou altera um aniversário na lista')
-        .addStringOption((o) => o.setName('data').setDescription('Dia e mês, ex: 25/12').setRequired(true).setMaxLength(5))
-        .addUserOption((o) => o.setName('utilizador').setDescription('De quem é o aniversário (por omissão, o teu)')),
+        .setName('birthday-add')
+        .setDescription('Add or change a birthday on the list')
+        .addStringOption((o) => o.setName('date').setDescription('Day and month, e.g. 25/12').setRequired(true).setMaxLength(5))
+        .addUserOption((o) => o.setName('user').setDescription('Whose birthday it is (defaults to you)')),
     new SlashCommandBuilder()
-        .setName('aniversario-status')
-        .setDescription('Mostra se o bot está a correr e há quanto tempo'),
+        .setName('birthday-status')
+        .setDescription('Show whether the bot is running and for how long'),
     new SlashCommandBuilder()
-        .setName('aniversarios-proximos')
-        .setDescription('Mostra os aniversários deste mês'),
+        .setName('birthdays-upcoming')
+        .setDescription("Show this month's birthdays"),
     new SlashCommandBuilder()
-        .setName('aniversario-help')
-        .setDescription('Explica o que o bot faz e os comandos disponíveis'),
+        .setName('birthday-help')
+        .setDescription('Explain what the bot does and list its commands'),
 ].map((c) => c.toJSON());
 
-// Texto do /aniversario-help para cada comando
+// /birthday-help text for each command
 const AJUDA = {
-    'aniversario-adicionar': 'Adiciona ou altera o teu aniversário, ex: `/aniversario-adicionar data:25/12`.\n'
-        + 'Com `utilizador:` adicionas o de outra pessoa (precisa da permissão **Gerir servidor**).',
-    'aniversario-status': 'Mostra se o bot está a correr, há quanto tempo, e a última e a próxima verificação.',
-    'aniversarios-proximos': 'Lista os aniversários deste mês. Os que já passaram aparecem riscados.',
-    'aniversario-help': 'Mostra esta ajuda.',
+    'birthday-add': 'Add or change your birthday, e.g. `/birthday-add date:25/12`.\n'
+        + "With `user:` you add someone else's (requires the **Manage Server** permission).",
+    'birthday-status': 'Show whether the bot is running, for how long, and the last and next check.',
+    'birthdays-upcoming': "List this month's birthdays. The ones that already passed are crossed out.",
+    'birthday-help': 'Show this help.',
 };
 
-/** Link para adicionar o bot a um servidor (já escolhido, se guildId for dado). */
+/** Link to add the bot to a server (preselected when guildId is given). */
 function urlConvite(clientId, guildId) {
     const url = new URL('https://discord.com/oauth2/authorize');
     url.searchParams.set('client_id', clientId);
@@ -52,8 +53,8 @@ function urlConvite(clientId, guildId) {
 }
 
 /**
- * Regista os comandos num servidor. Comandos de servidor ficam disponíveis logo,
- * ao contrário dos globais.
+ * Registers the commands in a server. Server commands are available right away,
+ * unlike global ones. This also replaces commands from older versions.
  * @param {import('discord.js').Guild} guild
  */
 async function registarComandos(guild) {
@@ -69,30 +70,30 @@ async function registarComandos(guild) {
     }
 }
 
-/** "3 dias, 4 h e 12 min" */
+/** "3 days, 4 h and 12 min" */
 function formatarDuracao(ms) {
     const minutos = Math.floor(ms / 60000);
     const dias = Math.floor(minutos / 1440);
     const horas = Math.floor((minutos % 1440) / 60);
     const partes = [];
-    if (dias) partes.push(`${dias} ${dias === 1 ? 'dia' : 'dias'}`);
+    if (dias) partes.push(`${dias} ${dias === 1 ? 'day' : 'days'}`);
     if (horas) partes.push(`${horas} h`);
     partes.push(`${minutos % 60} min`);
-    return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} e ${partes.at(-1)}` : partes[0];
+    return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} and ${partes.at(-1)}` : partes[0];
 }
 
 function linkPainel(guildId) {
-    return config.WEB_ENABLED ? `${config.PUBLIC_URL}/servidor/${guildId}` : null;
+    return config.WEB_ENABLED ? `${config.PUBLIC_URL}/server/${guildId}` : null;
 }
 
-/** Responde que o servidor ainda não foi configurado e devolve null; senão devolve a configuração. */
+/** Replies that the server isn't set up yet and returns null; otherwise returns its configuration. */
 async function exigirConfig(interaction) {
     const cfg = store.obterConfig(interaction.guildId);
     if (cfg) return cfg;
     const painel = linkPainel(interaction.guildId);
     await interaction.reply({
-        content: '⚙ Este servidor ainda não está configurado.'
-            + (painel ? ` Um administrador pode configurá-lo aqui: ${painel}` : ' Pede ao dono do bot para o configurar.'),
+        content: "⚙ This server isn't set up yet."
+            + (painel ? ` An admin can set it up here: ${painel}` : ' Ask the bot owner to set it up.'),
         flags: MessageFlags.Ephemeral,
     });
     return null;
@@ -103,21 +104,21 @@ async function adicionar(interaction) {
     const cfg = await exigirConfig(interaction);
     if (!cfg) return;
 
-    const texto = interaction.options.getString('data', true).trim();
+    const texto = interaction.options.getString('date', true).trim();
     const match = /^(\d{1,2})\/(\d{1,2})$/.exec(texto);
     const dia = Number(match?.[1]);
     const mes = Number(match?.[2]);
     if (!match || mes < 1 || mes > 12 || dia < 1 || dia > DIAS_POR_MES[mes - 1]) {
-        return interaction.reply({ content: `❌ "${texto}" não é uma data válida. Usa DD/MM, ex: 25/12.`, flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: `❌ "${texto}" isn't a valid date. Use DD/MM, e.g. 25/12.`, flags: MessageFlags.Ephemeral });
     }
 
-    const alvo = interaction.options.getUser('utilizador') ?? interaction.user;
+    const alvo = interaction.options.getUser('user') ?? interaction.user;
     if (alvo.bot) {
-        return interaction.reply({ content: '🤖 Bots não fazem anos.', flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: "🤖 Bots don't have birthdays.", flags: MessageFlags.Ephemeral });
     }
     if (alvo.id !== interaction.user.id && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
         return interaction.reply({
-            content: '❌ Só podes adicionar o teu próprio aniversário. Para adicionar o de outra pessoa precisas da permissão **Gerir servidor**.',
+            content: "❌ You can only add your own birthday. Adding someone else's requires the **Manage Server** permission.",
             flags: MessageFlags.Ephemeral,
         });
     }
@@ -126,24 +127,24 @@ async function adicionar(interaction) {
     const data = formatarData(dia, mes);
     const atual = (await lerAniversarios(interaction.client, cfg.birthdayChannelId)).find((a) => a.userId === alvo.id);
     if (atual?.dia === dia && atual?.mes === mes) {
-        return interaction.editReply({ content: `ℹ O aniversário de <@${alvo.id}> já está na lista: **${data}**.`, allowedMentions: SEM_PINGS });
+        return interaction.editReply({ content: `ℹ <@${alvo.id}>'s birthday is already on the list: **${data}**.`, allowedMentions: SEM_PINGS });
     }
 
-    // A lista vive no canal de aniversários; a mensagem mais recente de cada pessoa prevalece
+    // The list lives in the birthday channel; each person's most recent message wins
     const canal = await interaction.client.channels.fetch(cfg.birthdayChannelId);
     try {
         await canal.send({ content: `${data} - <@${alvo.id}>`, allowedMentions: SEM_PINGS });
     } catch (error) {
         if (error.code === RESTJSONErrorCodes.MissingPermissions || error.code === RESTJSONErrorCodes.MissingAccess) {
-            return interaction.editReply('❌ Não tenho permissão para escrever no canal de aniversários.');
+            return interaction.editReply("❌ I don't have permission to post in the birthday list channel.");
         }
         throw error;
     }
     console.log(`📝 [${interaction.guild?.name}] Birthday ${atual ? 'updated' : 'added'} by ${interaction.user.tag}: ${data} - ${alvo.tag} (${alvo.id})`);
 
     const resposta = atual
-        ? `✏ Aniversário de <@${alvo.id}> alterado de ${formatarData(atual.dia, atual.mes)} para **${data}**.`
-        : `🎂 Aniversário de <@${alvo.id}> adicionado: **${data}**.`;
+        ? `✏ <@${alvo.id}>'s birthday changed from ${formatarData(atual.dia, atual.mes)} to **${data}**.`
+        : `🎂 <@${alvo.id}>'s birthday added: **${data}**.`;
     return interaction.editReply({ content: resposta, allowedMentions: SEM_PINGS });
 }
 
@@ -154,24 +155,21 @@ async function status(interaction) {
 
     await interaction.deferReply();
     const lista = await lerAniversarios(interaction.client, cfg.birthdayChannelId);
-    const estado = store.lerEstado(interaction.guildId);
-
-    let ultima = 'ainda nenhuma';
-    if (estado.data) ultima = `${estado.data.split('-').reverse().join('/')} ${estado.concluido ? '✅' : '⚠ incompleta'}`;
 
     const ping = interaction.client.ws.ping;
     const linhas = [
-        cfg.enabled ? '🟢 **Bot de aniversários a correr**' : '⏸ **Bot a correr, mas os parabéns estão desligados neste servidor**',
-        `⏱ Online há **${formatarDuracao(Date.now() - ARRANQUE_MS)}** (desde <t:${Math.floor(ARRANQUE_MS / 1000)}:f>)`,
-        `📋 ${lista.length} aniversários na lista`,
-        `🔍 Última verificação: ${ultima}`,
-        `⏰ Próxima verificação: ${proximaVerificacao(interaction.guildId, cfg)}`,
-        `📅 Resumo mensal: ${cfg.monthlySummary ? 'ligado (dia 1)' : 'desligado'}`,
-        `🏷 Versão ${version}`,
+        cfg.enabled ? '🟢 **Birthday bot is running**' : '⏸ **Bot is running, but birthday messages are turned off in this server**',
+        `⏱ Online for **${formatarDuracao(Date.now() - ARRANQUE_MS)}** (since <t:${Math.floor(ARRANQUE_MS / 1000)}:f>)`,
+        `📋 ${lista.length} birthdays on the list`,
+        `🔍 Last check: ${ultimaVerificacao(interaction.guildId)}`,
+        `⏰ Next check: ${proximaVerificacao(interaction.guildId, cfg)}`,
+        `📅 Monthly summary: ${cfg.monthlySummary ? 'on (1st of the month)' : 'off'}`,
+        `🌐 Message language: ${idioma(cfg.language).nome}`,
+        `🏷 Version ${version}`,
     ];
     if (ping >= 0) linhas.push(`📶 Ping: ${ping} ms`);
     const painel = linkPainel(interaction.guildId);
-    if (painel) linhas.push(`⚙ Painel: ${painel}`);
+    if (painel) linhas.push(`⚙ Panel: ${painel}`);
     return interaction.editReply(linhas.join('\n'));
 }
 
@@ -184,17 +182,17 @@ async function proximos(interaction) {
     const hoje = agoraNoFuso(cfg.timezone);
     const doMes = aniversariosDoMes(await lerAniversarios(interaction.client, cfg.birthdayChannelId), hoje.mes);
     if (doMes.length === 0) {
-        return interaction.editReply(`📅 Ninguém faz anos em ${nomeDoMes(hoje.mes)}.`);
+        return interaction.editReply(`📅 Nobody has a birthday in ${nomeDoMes(hoje.mes)}.`);
     }
 
     const linhas = doMes.map((a) => {
         const entrada = `${formatarData(a.dia, a.mes)} - <@${a.userId}>`;
-        if (fazAnosHoje(a, hoje)) return `• 🎂 **${entrada}** (hoje!)`;
+        if (fazAnosHoje(a, hoje)) return `• 🎂 **${entrada}** (today!)`;
         if (a.dia < hoje.dia) return `• ~~${entrada}~~`;
         return `• ${entrada}`;
     });
     return interaction.editReply({
-        content: `📅 **Aniversários de ${nomeDoMes(hoje.mes)}**\n${linhas.join('\n')}`,
+        content: `📅 **Birthdays in ${nomeDoMes(hoje.mes)}**\n${linhas.join('\n')}`,
         allowedMentions: SEM_PINGS,
     });
 }
@@ -207,30 +205,30 @@ async function ajuda(interaction) {
     const funcionamento = [];
     if (cfg) {
         funcionamento.push(
-            `🎉 Todos os dias às **${cfg.checkTime}** (${cfg.timezone}) dou os parabéns em <#${cfg.generalChannelId}> a quem faz anos.`,
-            `📋 A lista está em <#${cfg.birthdayChannelId}>, uma linha por pessoa: \`25/12 - @pessoa\`.`,
+            `🎉 Every day at **${cfg.checkTime}** (${cfg.timezone}) I post a birthday message in <#${cfg.generalChannelId}>.`,
+            `📋 The list is in <#${cfg.birthdayChannelId}>, one line per person: \`25/12 - @person\`.`,
         );
-        if (cfg.monthlySummary) funcionamento.push('📅 No dia 1 de cada mês publico a lista dos aniversários desse mês.');
-        if (!cfg.enabled) funcionamento.push('⏸ Os parabéns estão desligados neste servidor.');
+        if (cfg.monthlySummary) funcionamento.push("📅 On the 1st of each month I post that month's birthdays.");
+        if (!cfg.enabled) funcionamento.push('⏸ Birthday messages are turned off in this server.');
     } else {
-        funcionamento.push('⚙ Este servidor ainda não está configurado.');
+        funcionamento.push("⚙ This server isn't set up yet.");
     }
-    if (painel) funcionamento.push(`🔧 Os administradores configuram o bot em ${painel}`);
+    if (painel) funcionamento.push(`🔧 Admins can set up the bot at ${painel}`);
 
     const embed = new EmbedBuilder()
         .setColor(0xf47fff)
-        .setTitle('🎂 Bot de aniversários')
+        .setTitle('🎂 Birthday bot')
         .setDescription(funcionamento.join('\n'))
         .addFields(definicoes.map((c) => ({ name: `/${c.name}`, value: AJUDA[c.name] ?? c.description })))
-        .setFooter({ text: 'Nenhum comando notifica as pessoas da lista.' });
+        .setFooter({ text: 'No command pings the people on the list.' });
     return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 const handlers = {
-    'aniversario-adicionar': adicionar,
-    'aniversario-status': status,
-    'aniversarios-proximos': proximos,
-    'aniversario-help': ajuda,
+    'birthday-add': adicionar,
+    'birthday-status': status,
+    'birthdays-upcoming': proximos,
+    'birthday-help': ajuda,
 };
 
 /** @param {import('discord.js').Interaction} interaction */
@@ -243,7 +241,7 @@ async function tratarInteracao(interaction) {
         await handler(interaction);
     } catch (error) {
         console.error(`❌ Command /${interaction.commandName} failed:`, error);
-        const mensagem = '❌ Ocorreu um erro. Tenta outra vez daqui a pouco.';
+        const mensagem = '❌ Something went wrong. Please try again in a moment.';
         if (interaction.deferred || interaction.replied) {
             await interaction.editReply(mensagem).catch(() => {});
         } else {

@@ -1,29 +1,32 @@
 # Changelog
 
-Cada versão é uma tag do GitHub. Para instalar uma versão específica, ver [Versões](README.md#versões) no README.
+Each version is a GitHub tag. To install a specific version, see [Versions](README.md#versions) in the README.
 
 ## v3.0.0
 
-- Vários servidores: cada um com os seus canais, hora, fuso, mensagem e resumo mensal, guardados em `data/guilds.json`.
-- Painel web com login Discord: cada pessoa configura os servidores onde tem **Gerir servidor**.
-- Cloudflare Tunnel (`deploy/cloudflared.sh`) e perguntas do painel no instalador do Proxmox.
-- O instalador escolhe a versão: `latest`, uma tag, ou `main`.
-- Versão visível no arranque e no `/aniversario-status`.
-- **Migração:** no primeiro arranque, o `BIRTHDAY_CHANNEL_ID`, o `GENERAL_CHANNEL_ID` e o estado de hoje passam para o `guilds.json` (o `estado.json` fica como `estado.json.migrated`). Para voltar a uma versão 2.x, renomeia-o de volta para `estado.json`.
+- Multiple servers: each one with its own channels, time, timezone, message and monthly summary, stored in `data/guilds.json`.
+- Web panel with Discord login: everyone sets up the servers where they have **Manage Server**.
+- Each server picks the language of the messages the bot posts (English or Portuguese) and an optional custom birthday message.
+- Commands, panel, logs, README and code comments in English. The commands are now `/birthday-add`, `/birthday-status`, `/birthdays-upcoming` and `/birthday-help` (they replace the old `/aniversario-*` ones automatically).
+- Cloudflare Tunnel (`deploy/cloudflared.sh`) and panel questions in the Proxmox installer.
+- The installer picks the version: `latest`, a tag, or `main`.
+- Version shown on startup and in `/birthday-status`.
+- `npm run dry-run` (`--dry-run`) replaces `npm run testar`.
+- **Migration:** on first start, `BIRTHDAY_CHANNEL_ID`, `GENERAL_CHANNEL_ID` and today's state move to `guilds.json` (`estado.json` is kept as `estado.json.migrated`), and the server keeps Portuguese messages. To go back to a 2.x version, rename it back to `estado.json`.
 
 ## v2.2.0
 
-- Comandos `/aniversario-adicionar`, `/aniversario-status`, `/aniversarios-proximos` e `/aniversario-help`.
+- Commands `/aniversario-adicionar`, `/aniversario-status`, `/aniversarios-proximos` and `/aniversario-help`.
 
 ## v2.1.0
 
-- Resumo dos aniversários do mês no dia 1.
-- Logs e instaladores em inglês, sem avisos de locale.
-- LXC criado com 256 MB por omissão.
+- Summary of the month's birthdays on the 1st.
+- Logs and installers in English, without locale warnings.
+- LXC created with 256 MB by default.
 
 ## v2.0.0
 
-- Bot sempre ligado num LXC do Proxmox (systemd) ou em Docker, em vez do GitHub Actions.
-- Verificação diária agendada com fuso horário, sem mensagens duplicadas após reinícios.
-- Lê todas as mensagens do canal de aniversários.
-- Instalação com um comando na shell do Proxmox.
+- Bot always on in a Proxmox LXC (systemd) or Docker, instead of GitHub Actions.
+- Daily check scheduled with a timezone, without duplicate messages after restarts.
+- Reads every message in the birthday channel.
+- One-command install from the Proxmox shell.

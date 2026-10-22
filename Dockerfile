@@ -1,6 +1,6 @@
 FROM node:22-alpine
 
-# tzdata para o fuso horário (TZ) funcionar também nos logs
+# tzdata so the timezone (TZ) also applies to log timestamps
 RUN apk add --no-cache tzdata
 
 WORKDIR /app

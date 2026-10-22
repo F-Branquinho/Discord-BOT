@@ -2,11 +2,11 @@
   "name": "discord-birthday-bot",
   "version": "3.0.0",
   "private": true,
-  "description": "Bot de Discord que dá os parabéns aos membros no dia de anos",
+  "description": "Discord bot that wishes members a happy birthday, with a web panel to set up each server",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "testar": "node src/index.js --testar"
+    "dry-run": "node src/index.js --dry-run"
   },
   "engines": {
     "node": ">=18"

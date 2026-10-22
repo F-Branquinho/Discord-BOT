@@ -1,14 +1,15 @@
 const { RESTJSONErrorCodes } = require('discord.js');
+const { idioma } = require('./i18n');
 
-// Aceita "25/12 - @utilizador", "5/3 – @utilizador", "25/12: @utilizador"
+// Accepts "25/12 - @user", "5/3 – @user", "25/12: @user"
 const REGEX_ANIVERSARIO = /(\d{1,2})\/(\d{1,2})\s*[-–—:]\s*<@!?(\d+)>/g;
 const MAX_MENSAGENS = 500;
 
 /**
- * Lê todas as mensagens do canal de aniversários e extrai a lista.
- * Se um utilizador aparecer mais de uma vez, prevalece a mensagem mais recente.
+ * Reads every message in the birthday list channel and extracts the list.
+ * If someone appears more than once, the most recent message wins.
  * @param {import('discord.js').Client} client
- * @param {string} canalId - canal de aniversários do servidor
+ * @param {string} canalId - the server's birthday list channel
  * @returns {Promise<{ userId: string, dia: number, mes: number }[]>}
  */
 async function lerAniversarios(client, canalId) {
@@ -25,7 +26,7 @@ async function lerAniversarios(client, canalId) {
     }
 
     const porUtilizador = new Map();
-    // Das mais antigas para as mais recentes, para as recentes prevalecerem
+    // Oldest first, so the most recent entries win
     for (const mensagem of mensagens.reverse()) {
         for (const [, d, m, userId] of mensagem.content.matchAll(REGEX_ANIVERSARIO)) {
             const dia = Number(d);
@@ -46,7 +47,7 @@ function eBissexto(ano) {
 }
 
 /**
- * Quem nasceu a 29/02 recebe os parabéns a 28/02 nos anos não bissextos.
+ * People born on 29/02 are celebrated on 28/02 in non-leap years.
  */
 function fazAnosHoje(aniversario, hoje) {
     if (aniversario.dia === hoje.dia && aniversario.mes === hoje.mes) return true;
@@ -66,9 +67,9 @@ function formatarData(dia, mes) {
     return `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`;
 }
 
-/** "Novembro", "Março", ... */
-function nomeDoMes(mes) {
-    const nome = new Intl.DateTimeFormat('pt-PT', { month: 'long', timeZone: 'UTC' })
+/** Capitalised month name in the given language: "November", "Março", ... */
+function nomeDoMes(mes, codigoIdioma = 'en') {
+    const nome = new Intl.DateTimeFormat(idioma(codigoIdioma).locale, { month: 'long', timeZone: 'UTC' })
         .format(new Date(Date.UTC(2000, mes - 1, 1)));
     return nome[0].toUpperCase() + nome.slice(1);
 }
@@ -78,24 +79,33 @@ function aniversariosDoMes(lista, mes) {
 }
 
 /**
- * Texto do resumo mensal, ou null se ninguém fizer anos nesse mês.
+ * The birthday message for a user: the server's custom message, or the default for its language.
+ * @param {import('./store').ConfigServidor} cfg
+ */
+function mensagemAniversario(cfg, userId) {
+    return (cfg.message || idioma(cfg.language).mensagemAniversario).replaceAll('{user}', `<@${userId}>`);
+}
+
+/**
+ * Monthly summary text in the server's language, or null if nobody has a birthday that month.
  * @param {{ userId: string, dia: number, mes: number }[]} lista
  * @param {{ mes: number }} hoje
+ * @param {string} codigoIdioma
  */
-function mensagemResumoMensal(lista, hoje) {
+function mensagemResumoMensal(lista, hoje, codigoIdioma) {
     const doMes = aniversariosDoMes(lista, hoje.mes);
     if (doMes.length === 0) return null;
 
     const linhas = doMes.map((a) => `• ${formatarData(a.dia, a.mes)} - <@${a.userId}>`);
-    return `📅 **Aniversários de ${nomeDoMes(hoje.mes)}**\n${linhas.join('\n')}`;
+    return `${idioma(codigoIdioma).tituloResumo(nomeDoMes(hoje.mes, codigoIdioma))}\n${linhas.join('\n')}`;
 }
 
 /**
- * Envia a lista de aniversários do mês. As menções não notificam ninguém,
- * cada pessoa já é mencionada no dia de anos.
+ * Posts this month's birthdays. Mentions don't ping anyone,
+ * since everyone is already mentioned on their birthday.
  */
 async function enviarResumoMensal(client, cfg, lista, hoje) {
-    const conteudo = mensagemResumoMensal(lista, hoje);
+    const conteudo = mensagemResumoMensal(lista, hoje, cfg.language);
     if (!conteudo) {
         console.log('📅 No birthdays this month, skipping monthly summary');
         return;
@@ -106,13 +116,13 @@ async function enviarResumoMensal(client, cfg, lista, hoje) {
 }
 
 /**
- * Envia os parabéns a quem faz anos hoje e ainda não os recebeu.
+ * Sends the birthday message to everyone whose birthday is today and who hasn't got it yet.
  * @param {import('discord.js').Client} client
  * @param {import('./store').ConfigServidor} cfg
  * @param {{ userId: string, dia: number, mes: number }[]} lista
  * @param {{ dia: number, mes: number, ano: number }} hoje
- * @param {Set<string>} jaEnviados - IDs que já receberam mensagem hoje
- * @param {(userId: string) => void} aoEnviar - chamado após cada utilizador tratado
+ * @param {Set<string>} jaEnviados - IDs that already got a message today
+ * @param {(userId: string) => void} aoEnviar - called after each user is handled
  */
 async function verificarAniversarios(client, cfg, lista, hoje, jaEnviados, aoEnviar) {
     const aniversariantes = lista.filter((a) => fazAnosHoje(a, hoje) && !jaEnviados.has(a.userId));
@@ -133,8 +143,7 @@ async function verificarAniversarios(client, cfg, lista, hoje, jaEnviados, aoEnv
             throw error;
         }
 
-        const conteudo = cfg.message.replaceAll('{user}', `<@${userId}>`);
-        await canalGeral.send({ content: conteudo, allowedMentions: { users: [userId] } });
+        await canalGeral.send({ content: mensagemAniversario(cfg, userId), allowedMentions: { users: [userId] } });
         console.log(`📢 Birthday message sent to ${userId}`);
         aoEnviar(userId);
     }
@@ -147,6 +156,7 @@ module.exports = {
     formatarData,
     nomeDoMes,
     aniversariosDoMes,
+    mensagemAniversario,
     mensagemResumoMensal,
     enviarResumoMensal,
     verificarAniversarios,

@@ -1,135 +1,136 @@
 # Discord Birthday Bot
 
-Bot de Discord que dá os parabéns aos membros no dia de anos, em vários servidores, com um painel web para configurar cada servidor. Corre 24/7 num LXC do Proxmox (ou em Docker) e é publicado na internet através de um Cloudflare Tunnel.
+A Discord bot that wishes members a happy birthday on their day, across multiple servers, with a web panel to set up each server. It runs 24/7 in a Proxmox LXC (or Docker) and is published to the internet through a Cloudflare Tunnel.
 
-## Como funciona
+## How it works
 
-- Cada servidor escolhe, no painel, um **canal com a lista** e um **canal para os parabéns**. A lista tem uma linha por pessoa:
+- In the panel, each server picks a **birthday list channel** and a **channel for birthday messages**. The list has one line per person:
   ```
-  25/12 - @Utilizador
-  03/07 - @OutroUtilizador
+  25/12 - @User
+  03/07 - @AnotherUser
   ```
-  O bot lê todas as mensagens do canal (até 500). Se alguém aparecer mais de uma vez, conta a mensagem mais recente. O `/aniversario-adicionar` escreve neste canal.
-- Todos os dias, à hora e no fuso de cada servidor, o bot relê a lista e envia os parabéns.
-- No dia 1 de cada mês, envia também a lista dos aniversários desse mês (sem notificar ninguém).
-- O que já foi enviado fica guardado em `data/guilds.json`. Reiniciar não repete mensagens, e se o bot estiver em baixo à hora marcada, envia quando voltar (no mesmo dia).
-- Quem nasceu a 29/02 recebe os parabéns a 28/02 nos anos não bissextos.
-- Se a verificação falhar (por exemplo, o Discord está em baixo), volta a tentar de 5 em 5 minutos.
+  The bot reads every message in the channel (up to 500). If someone appears more than once, the most recent message wins. `/birthday-add` writes to this channel.
+- Every day, at each server's time and timezone, the bot reads the list again and posts the birthday messages.
+- On the 1st of each month it also posts that month's birthdays (without pinging anyone).
+- Each server picks the **language** of the messages the bot posts (English or Portuguese) and can set a custom birthday message.
+- What was already sent is stored in `data/guilds.json`. Restarts never repeat messages, and if the bot is down at the scheduled time, it sends them when it's back (on the same day).
+- People born on 29/02 are celebrated on 28/02 in non-leap years.
+- If a check fails (for example, Discord is down), it retries every 5 minutes.
 
-## Comandos
+## Commands
 
-| Comando | O que faz |
+| Command | What it does |
 |---|---|
-| `/aniversario-adicionar data:25/12` | Adiciona ou altera o teu aniversário. Com `utilizador:`, adiciona o de outra pessoa (precisa de **Gerir servidor**). |
-| `/aniversario-status` | Mostra se o bot está a correr, há quanto tempo, a última e a próxima verificação. |
-| `/aniversarios-proximos` | Lista os aniversários deste mês (os que já passaram aparecem riscados). |
-| `/aniversario-help` | Explica o que o bot faz e lista os comandos (só tu vês a resposta). |
+| `/birthday-add date:25/12` | Adds or changes your birthday. With `user:`, adds someone else's (requires **Manage Server**). |
+| `/birthday-status` | Shows whether the bot is running, for how long, and the last and next check. |
+| `/birthdays-upcoming` | Lists this month's birthdays (the ones that already passed are crossed out). |
+| `/birthday-help` | Explains what the bot does and lists the commands (only you see the reply). |
 
-Nenhum comando notifica as pessoas listadas.
+No command pings the people on the list.
 
-## Painel web
+## Web panel
 
-- **Entrar com Discord**: cada pessoa vê os servidores onde tem a permissão **Gerir servidor**.
-- Servidores sem o bot têm um botão **Adicionar bot**; os outros, **Configurar**.
-- Em cada servidor escolhes os canais, a hora, o fuso, a mensagem, e ligas ou desligas o resumo mensal e os parabéns. O painel avisa se faltarem permissões ao bot nos canais escolhidos.
-- A permissão é confirmada pelo bot a cada pedido, por isso tirar a permissão a alguém no Discord tem efeito imediato.
-- `/saude` responde `ok` quando o bot está ligado (útil para o Uptime Kuma, por exemplo).
+- **Log in with Discord**: everyone sees the servers where they have the **Manage Server** permission.
+- Servers without the bot have an **Add bot** button; the others, **Set up**.
+- For each server you choose the channels, the time, the timezone, the message language and an optional custom message, and turn the monthly summary and the birthday messages on or off. The panel warns you if the bot is missing permissions in the chosen channels.
+- The bot checks the permission on every request, so removing someone's permission in Discord takes effect right away.
+- `/health` returns `ok` while the bot is connected (handy for Uptime Kuma, for example).
 
-## Preparar o Discord e a Cloudflare
+## Setting up Discord and Cloudflare
 
-**Discord** ([Developer Portal](https://discord.com/developers/applications) → a tua aplicação):
+**Discord** ([Developer Portal](https://discord.com/developers/applications) → your application):
 
-1. **Bot** → ativa **Message Content Intent**.
-2. **OAuth2** → copia o **Client Secret** (é o `DISCORD_CLIENT_SECRET`).
-3. **OAuth2** → **Redirects** → adiciona `https://bot.teudominio.com/callback`.
+1. **Bot** → turn on **Message Content Intent**.
+2. **OAuth2** → copy the **Client Secret** (this is `DISCORD_CLIENT_SECRET`).
+3. **OAuth2** → **Redirects** → add `https://bot.yourdomain.com/callback`.
 
 **Cloudflare** ([Zero Trust](https://one.dash.cloudflare.com/) → **Networks** → **Tunnels**):
 
-1. **Create a tunnel** → **Cloudflared** → dá-lhe um nome (ex: `homelab`).
-2. Copia o **token** do comando de instalação (a parte comprida depois de `cloudflared service install`).
-3. **Public hostname**: subdomínio `bot`, o teu domínio, serviço **HTTP** → `localhost:3000`.
+1. **Create a tunnel** → **Cloudflared** → give it a name (e.g. `homelab`).
+2. Copy the **token** from the install command (the long part after `cloudflared service install`).
+3. **Public hostname**: subdomain `bot`, your domain, service **HTTP** → `localhost:3000`.
 
-O mesmo túnel pode publicar outros serviços do homelab: basta acrescentar mais public hostnames (ex: `jellyfin.teudominio.com` → `http://192.168.1.50:8096`).
+The same tunnel can publish other homelab services: just add more public hostnames (e.g. `jellyfin.yourdomain.com` → `http://192.168.1.50:8096`).
 
-## Instalação no Proxmox com um comando (recomendado)
+## One-command install on Proxmox (recommended)
 
-Na **Shell do nó Proxmox** (interface web → nó → Shell):
+On the **Proxmox host shell** (web UI → node → Shell):
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/proxmox-lxc.sh)"
 ```
 
-O script pede o token do bot, o endereço do painel, o client secret e o token do túnel; cria um LXC Debian 12 (1 core, 256 MB, 4 GB, DHCP, arranca com o Proxmox), instala o bot e o túnel e deixa tudo a correr.
-Para mudar os recursos: `CTID=150 MEMORY=1024 STORAGE=local-zfs bash -c "$(curl ...)"`.
+The script asks for the bot token, the panel address, the client secret and the tunnel token; it creates a Debian 12 LXC (1 core, 256 MB, 4 GB, DHCP, starts with Proxmox), installs the bot and the tunnel, and leaves everything running.
+To change the resources: `CTID=150 MEMORY=1024 STORAGE=local-zfs bash -c "$(curl ...)"`.
 
 ```bash
 pct exec <CTID> -- journalctl -u discord-bot -f              # logs
-pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash'   # atualizar para a release mais recente
-pct exec <CTID> -- nano /opt/discord-bot/.env                # mudar configuração (depois: systemctl restart discord-bot)
+pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash'   # update to the latest release
+pct exec <CTID> -- nano /opt/discord-bot/.env                # change settings (then: systemctl restart discord-bot)
 ```
 
-### Atualizar uma instalação antiga (um só servidor)
+### Updating an older install (single server)
 
-Nas instalações anteriores à v3.0.0, o `install.sh` que está no LXC ainda atualiza sempre para o `main`. Usa o do GitHub, com a versão explícita:
+On installs older than v3.0.0, the `install.sh` inside the LXC still always updates to `main`. Use the one from GitHub, with an explicit version:
 
 ```bash
 pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash -s -- v3.0.0'
 ```
 
-No primeiro arranque, o bot passa sozinho o `BIRTHDAY_CHANNEL_ID`, o `GENERAL_CHANNEL_ID` e o estado de hoje para o `data/guilds.json`. Tudo continua a funcionar como antes. Para ligar o painel:
+On first start, the bot moves `BIRTHDAY_CHANNEL_ID`, `GENERAL_CHANNEL_ID` and today's state into `data/guilds.json`, and keeps the messages in Portuguese as before. Everything keeps working. To turn on the panel:
 
 ```bash
-pct exec <CTID> -- nano /opt/discord-bot/.env      # acrescenta PUBLIC_URL e DISCORD_CLIENT_SECRET
+pct exec <CTID> -- nano /opt/discord-bot/.env      # add PUBLIC_URL and DISCORD_CLIENT_SECRET
 pct exec <CTID> -- systemctl restart discord-bot
-pct exec <CTID> -- bash /opt/discord-bot/deploy/cloudflared.sh   # pede o token do túnel
+pct exec <CTID> -- bash /opt/discord-bot/deploy/cloudflared.sh   # asks for the tunnel token
 ```
 
-## Versões
+## Versions
 
-Cada versão é uma tag do GitHub (ver o [CHANGELOG](CHANGELOG.md)). O bot nunca se atualiza sozinho: só muda de versão quando corres o instalador.
+Each version is a GitHub tag (see the [CHANGELOG](CHANGELOG.md)). The bot never updates itself: it only changes version when you run the installer.
 
-Usa sempre o instalador do `main` (é ele que sabe escolher versões), dentro do LXC:
+Always use the installer from `main` (it's the one that knows how to pick versions), inside the LXC:
 
 ```bash
-# ver as versões disponíveis e a instalada
+# list the available versions and the installed one
 pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash -s -- --list'
 
-# instalar uma versão específica (também serve para voltar atrás)
+# install a specific version (also works for going back)
 pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash -s -- v2.2.0'
 
-# instalar a mais recente
+# install the latest one
 pct exec <CTID> -- bash -c 'curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh | bash -s -- latest'
 ```
 
-`main` instala o código mais recente, ainda sem release. Num LXC novo: `VERSION=v2.2.0 bash -c "$(curl -fsSL .../proxmox-lxc.sh)"`.
+`main` installs the latest code, not released yet. For a new LXC: `VERSION=v2.2.0 bash -c "$(curl -fsSL .../proxmox-lxc.sh)"`.
 
-Para publicar uma versão nova: atualizar a `version` no `package.json` e o `CHANGELOG.md`, fazer commit, e `git tag vX.Y.Z && git push --tags`.
+To publish a new version: update `version` in `package.json` and `CHANGELOG.md`, commit, then `git tag vX.Y.Z && git push --tags`.
 
-## Instalação manual num LXC
+## Manual install in an LXC
 
-1. No Proxmox: **local → CT Templates → Templates**, descarrega `debian-12-standard`.
-2. **Create CT**: unprivileged, 1 core, 256 MB RAM, 4 GB disco, rede DHCP. Em **Options**, ativa **Start at boot**.
-3. Na consola do LXC, como root:
+1. In Proxmox: **local → CT Templates → Templates**, download `debian-12-standard`.
+2. **Create CT**: unprivileged, 1 core, 256 MB RAM, 4 GB disk, DHCP network. Under **Options**, turn on **Start at boot**.
+3. In the LXC console, as root:
    ```bash
    apt update && apt install -y curl
    bash -c "$(curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh)"
    nano /opt/discord-bot/.env
    systemctl restart discord-bot
-   bash /opt/discord-bot/deploy/cloudflared.sh     # opcional: Cloudflare Tunnel
+   bash /opt/discord-bot/deploy/cloudflared.sh     # optional: Cloudflare Tunnel
    ```
 
-O bot corre como serviço systemd (`discord-bot`), com utilizador próprio, e reinicia sozinho se falhar.
+The bot runs as a systemd service (`discord-bot`) under its own user, and restarts by itself if it crashes.
 
 ```bash
-systemctl status discord-bot                              # estado
+systemctl status discord-bot                              # status
 journalctl -u discord-bot -f                              # logs
-cd /opt/discord-bot && node src/index.js --testar         # mostra a lista de cada servidor, sem enviar nada
-bash /opt/discord-bot/deploy/install.sh v2.2.0            # mudar de versão (sem argumento: a mais recente)
+cd /opt/discord-bot && npm run dry-run                    # print each server's list without sending anything
+bash /opt/discord-bot/deploy/install.sh v2.2.0            # switch version (no argument: the latest)
 ```
 
-## Instalação com Docker
+## Docker install
 
-Numa VM ou LXC com Docker e Docker Compose:
+On a VM or LXC with Docker and Docker Compose:
 
 ```bash
 git clone https://github.com/F-Branquinho/Discord-BOT.git discord-bot
@@ -139,35 +140,36 @@ nano .env
 docker compose up -d --build
 ```
 
-O painel fica na porta 3000 do host; aponta o public hostname do túnel para `http://<ip-do-host>:3000`.
+The panel is on port 3000 of the host; point the tunnel's public hostname at `http://<host-ip>:3000`.
 
-> Num LXC sem privilégios no Proxmox, ativa `nesting=1` (e `keyctl=1`) nas opções do contentor para o Docker funcionar.
+> In an unprivileged Proxmox LXC, turn on `nesting=1` (and `keyctl=1`) in the container options for Docker to work.
 
 ```bash
-docker compose logs -f                      # ver logs
-docker compose run --rm bot npm run testar  # mostra a lista de cada servidor, sem enviar nada
-git fetch --tags && git checkout v3.0.0 && docker compose up -d --build   # mudar de versão
+docker compose logs -f                       # logs
+docker compose run --rm bot npm run dry-run  # print each server's list without sending anything
+git fetch --tags && git checkout v3.0.0 && docker compose up -d --build   # switch version
 ```
 
-## Configuração (`.env`)
+## Configuration (`.env`)
 
-| Variável | Obrigatória | Por omissão | Descrição |
+| Variable | Required | Default | Description |
 |---|---|---|---|
-| `BOT_TOKEN` | sim | | Token do bot |
-| `PUBLIC_URL` | para o painel | | Endereço público do painel, ex: `https://bot.teudominio.com` |
-| `DISCORD_CLIENT_SECRET` | para o painel | | Developer Portal → OAuth2 → Client Secret |
-| `WEB_PORT` | não | `3000` | Porta do painel |
-| `WEB_HOST` | não | `0.0.0.0` | Interface onde o painel escuta (`127.0.0.1` se o túnel estiver no mesmo LXC) |
-| `TIMEZONE` | não | `Europe/Lisbon` | Fuso por omissão para servidores novos |
-| `CHECK_TIME` | não | `00:01` | Hora por omissão para servidores novos (HH:MM) |
-| `BIRTHDAY_MESSAGE` | não | `🎉 Hoje é o teu dia, {user}! 🎂 Feliz aniversário!` | Mensagem por omissão; `{user}` é substituído pela menção |
-| `MONTHLY_SUMMARY` | não | `true` | Resumo mensal ligado por omissão |
-| `BIRTHDAY_CHANNEL_ID`, `GENERAL_CHANNEL_ID` | não | | Configuração de um só servidor sem painel; migrada para o `guilds.json` no primeiro arranque |
+| `BOT_TOKEN` | yes | | Bot token |
+| `PUBLIC_URL` | for the panel | | Public panel address, e.g. `https://bot.yourdomain.com` |
+| `DISCORD_CLIENT_SECRET` | for the panel | | Developer Portal → OAuth2 → Client Secret |
+| `WEB_PORT` | no | `3000` | Panel port |
+| `WEB_HOST` | no | `0.0.0.0` | Interface the panel listens on (`127.0.0.1` if the tunnel runs in the same LXC) |
+| `TIMEZONE` | no | `Europe/Lisbon` | Default timezone for new servers |
+| `CHECK_TIME` | no | `00:01` | Default check time for new servers (HH:MM) |
+| `BOT_LANGUAGE` | no | `en` | Default message language for new servers (`en` or `pt`) |
+| `BIRTHDAY_MESSAGE` | no | | Default custom message for new servers; empty uses the language default. `{user}` is replaced by the mention |
+| `MONTHLY_SUMMARY` | no | `true` | Monthly summary on by default |
+| `BIRTHDAY_CHANNEL_ID`, `GENERAL_CHANNEL_ID` | no | | Single-server setup without the panel; moved to `guilds.json` on first start |
 
-## Correr sem Docker
+## Running without Docker
 
 ```bash
 npm install
 npm start
-npm run testar
+npm run dry-run
 ```

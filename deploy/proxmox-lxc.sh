@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Cria um LXC no Proxmox com o bot instalado e a correr. Correr na shell do nó Proxmox:
+# Creates a Proxmox LXC with the bot installed and running. Run it on the Proxmox host shell:
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/proxmox-lxc.sh)"
 #
-# Opções (variáveis de ambiente, todas opcionais):
-#   VERSION (latest, uma tag como v2.2.0, ou main), CTID, CT_HOSTNAME, STORAGE, BRIDGE, CORES, MEMORY, DISK, TEMPLATE
+# Options (environment variables, all optional):
+#   VERSION (latest, a tag such as v2.2.0, or main), CTID, CT_HOSTNAME, STORAGE, BRIDGE, CORES, MEMORY, DISK, TEMPLATE
 #   BOT_TOKEN, PUBLIC_URL, DISCORD_CLIENT_SECRET, CLOUDFLARE_TUNNEL_TOKEN,
-#   BIRTHDAY_CHANNEL_ID, GENERAL_CHANNEL_ID, TIMEZONE, CHECK_TIME
+#   BIRTHDAY_CHANNEL_ID, GENERAL_CHANNEL_ID, TIMEZONE, CHECK_TIME, BOT_LANGUAGE
 set -euo pipefail
 
 INSTALL_URL="https://raw.githubusercontent.com/F-Branquinho/Discord-BOT/main/deploy/install.sh"
@@ -22,7 +22,7 @@ DISK="${DISK:-4}"
 
 erro() { echo "❌ $*" >&2; exit 1; }
 
-# Tira espaços e \r (colagens vindas do Windows)
+# Strips spaces and \r (from text pasted on Windows)
 limpar() {
     local v="${1//$'\r'/}"
     v="${v#"${v%%[![:space:]]*}"}"
@@ -37,10 +37,11 @@ valido_url() { [ -z "$1" ] || [[ "$1" =~ ^https://[^/]+/?$ ]]; }
 valido_segredo() { [[ "$1" =~ ^[A-Za-z0-9_-]{20,}$ ]]; }
 valido_tunel() { [ -z "$1" ] || [[ "${1##* }" =~ ^[A-Za-z0-9_=-]{50,}$ ]]; }
 valido_id_opcional() { [ -z "$1" ] || valido_id "$1"; }
+valido_idioma() { [[ "$1" =~ ^(en|pt)$ ]]; }
 
-# perguntar VARIAVEL "texto" validador [omissão] [secreto]
-# Usa a variável de ambiente se já estiver definida e for válida; senão pergunta até ser válida
-# (os validadores opcionais aceitam vazio, ou seja, Enter para saltar).
+# perguntar VARIABLE "prompt" validator [default] [secret]
+# Uses the environment variable if it is already set and valid; otherwise asks until the answer is valid
+# (optional validators accept an empty answer, i.e. Enter to skip).
 perguntar() {
     local var="$1" texto="$2" validar="$3" omissao="${4:-}" secreto="${5:-}" valor
     valor="$(limpar "${!var:-}")"
@@ -49,7 +50,7 @@ perguntar() {
         return
     fi
     while true; do
-        # Descartar linhas a mais que tenham sido coladas
+        # Drop extra lines that were pasted along with the answer
         while read -r -t 0.1 _; do :; done
         if [ -n "$secreto" ]; then
             read -rsp "$texto: " valor || erro "Input ended."
@@ -75,7 +76,7 @@ command -v pct >/dev/null || erro "This script must run on the Proxmox host shel
 echo "🎂 Discord Birthday Bot: LXC installer"
 echo
 
-# Pedir configuração antes de criar o que quer que seja
+# Ask for everything before creating anything
 perguntar BOT_TOKEN "BOT_TOKEN (hidden while typing)" valido_token "" secreto
 
 echo
@@ -98,17 +99,19 @@ else
 fi
 perguntar TIMEZONE "Default timezone" valido_tz "Europe/Lisbon"
 perguntar CHECK_TIME "Default daily check time (HH:MM)" valido_hora "00:01"
+perguntar BOT_LANGUAGE "Default message language (en or pt)" valido_idioma "en"
 
 echo
 echo "Birthday list channel: ${BIRTHDAY_CHANNEL_ID:-(choose in the panel)}"
 echo "Messages channel:      ${GENERAL_CHANNEL_ID:-(choose in the panel)}"
 echo "Daily check:           $CHECK_TIME ($TIMEZONE)"
+echo "Message language:      $BOT_LANGUAGE"
 echo "Web panel:             ${PUBLIC_URL:-disabled}${CLOUDFLARE_TUNNEL_TOKEN:+ (with Cloudflare Tunnel)}"
 echo "CT $CTID ($CT_HOSTNAME): $CORES core, ${MEMORY} MB RAM, ${DISK} GB on $STORAGE, network $BRIDGE (DHCP)"
 read -rp "Continue? [Y/n] " CONFIRMAR
 [[ "${CONFIRMAR:-Y}" =~ ^[YySs]$ ]] || erro "Cancelled."
 
-# Template Debian
+# Debian template
 if [ -z "${TEMPLATE:-}" ]; then
     echo "📦 Looking for Debian 12 template..."
     pveam update >/dev/null
@@ -143,12 +146,12 @@ done
 pct exec "$CTID" -- getent hosts deb.debian.org >/dev/null 2>&1 || erro "Container $CTID has no internet access."
 
 echo "📦 Installing the bot (this may take a few minutes)..."
-# C.UTF-8 existe sempre; o en_US.UTF-8 herdado do Proxmox não está instalado no template.
-# SKIP_START: o .env só é copiado a seguir, por isso o install.sh não deve arrancar o bot.
+# C.UTF-8 always exists; the en_US.UTF-8 inherited from Proxmox is not installed in the template.
+# SKIP_START: the .env is only copied afterwards, so install.sh must not start the bot yet.
 pct exec "$CTID" -- env LANG=C.UTF-8 LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive SKIP_START=1 VERSION="${VERSION:-latest}" \
     bash -c "apt-get update -qq && apt-get install -y -qq curl >/dev/null && curl -fsSL '$INSTALL_URL' | bash"
 
-# Escrever o .env sem que o token apareça na linha de comandos
+# Write the .env without the token ever showing up on a command line
 ENV_TMP="$(mktemp)"
 trap 'rm -f "$ENV_TMP"' EXIT
 chmod 600 "$ENV_TMP"
@@ -156,6 +159,7 @@ chmod 600 "$ENV_TMP"
     echo "BOT_TOKEN=$BOT_TOKEN"
     echo "TIMEZONE=$TIMEZONE"
     echo "CHECK_TIME=$CHECK_TIME"
+    echo "BOT_LANGUAGE=$BOT_LANGUAGE"
     if [ -n "$BIRTHDAY_CHANNEL_ID" ] && [ -n "$GENERAL_CHANNEL_ID" ]; then
         echo "BIRTHDAY_CHANNEL_ID=$BIRTHDAY_CHANNEL_ID"
         echo "GENERAL_CHANNEL_ID=$GENERAL_CHANNEL_ID"

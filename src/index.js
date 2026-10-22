@@ -7,8 +7,8 @@ const { agoraNoFuso, iniciarAgendador } = require('./scheduler');
 const { registarComandos, tratarInteracao } = require('./commands');
 const { configAntiga, migrarConfigAntiga } = require('./migrate');
 
-// --testar: mostra a lista lida de cada servidor e quem faz anos hoje, sem enviar nada
-const MODO_TESTE = process.argv.includes('--testar');
+// --dry-run: prints each server's list and today's birthdays without sending anything
+const MODO_TESTE = process.argv.includes('--dry-run');
 
 const client = new Client({
     intents: [
@@ -41,7 +41,7 @@ async function testar() {
         }
         console.log(`Now: ${hoje.data} ${hoje.horaMinuto} in ${cfg.timezone}`);
         console.log(`📅 Monthly summary preview (sent on day 1${cfg.monthlySummary ? '' : ', disabled'}):`);
-        console.log(mensagemResumoMensal(lista, hoje) ?? '(no birthdays this month, nothing would be sent)');
+        console.log(mensagemResumoMensal(lista, hoje, cfg.language) ?? '(no birthdays this month, nothing would be sent)');
     }
 }
 

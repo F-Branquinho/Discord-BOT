@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('./config');
 
-// Configuração e estado de cada servidor, num único ficheiro JSON:
+// Configuration and state of every server, in a single JSON file:
 // { guilds: { [guildId]: { config: ConfigServidor, estado: EstadoServidor } } }
 const FICHEIRO = path.join(config.DATA_DIR, 'guilds.json');
 
@@ -11,9 +11,13 @@ fs.mkdirSync(config.DATA_DIR, { recursive: true });
 /**
  * @typedef {{
  *   birthdayChannelId: string, generalChannelId: string, timezone: string, checkTime: string,
- *   message: string, monthlySummary: boolean, enabled: boolean,
+ *   language: string, message: string | null, monthlySummary: boolean, enabled: boolean,
  * }} ConfigServidor
+ * `message` is a custom birthday message; null means the default for `language`.
+ *
  * @typedef {{ data: string | null, enviados: string[], concluido: boolean, resumo: string | null }} EstadoServidor
+ * `data` is the last checked day (YYYY-MM-DD), `enviados` who already got a message that day,
+ * `resumo` the last month (YYYY-MM) whose summary was posted.
  */
 
 function carregar() {
@@ -21,7 +25,7 @@ function carregar() {
         return JSON.parse(fs.readFileSync(FICHEIRO, 'utf8'));
     } catch (error) {
         if (error.code === 'ENOENT') return { guilds: {} };
-        // Guardar uma cópia do ficheiro estragado em vez de o perder
+        // Keep a copy of the broken file instead of losing it
         const copia = `${FICHEIRO}.corrupt-${Date.now()}`;
         fs.copyFileSync(FICHEIRO, copia);
         console.error(`❌ Unreadable ${FICHEIRO}, starting fresh (backup at ${copia}):`, error.message);
@@ -32,7 +36,7 @@ function carregar() {
 const dados = carregar();
 
 function guardar() {
-    // Escrever para um ficheiro temporário e renomear evita ficheiros corrompidos
+    // Write to a temporary file and rename it, so a crash never leaves a half-written file
     const temporario = `${FICHEIRO}.tmp`;
     fs.writeFileSync(temporario, JSON.stringify(dados, null, 2));
     fs.renameSync(temporario, FICHEIRO);
@@ -45,6 +49,7 @@ function configPorOmissao() {
         generalChannelId: '',
         timezone: config.DEFAULT_TIMEZONE,
         checkTime: config.DEFAULT_CHECK_TIME,
+        language: config.DEFAULT_LANGUAGE,
         message: config.DEFAULT_MESSAGE,
         monthlySummary: config.DEFAULT_MONTHLY_SUMMARY,
         enabled: true,
@@ -56,10 +61,14 @@ function estadoVazio() {
     return { data: null, enviados: [], concluido: false, resumo: null };
 }
 
-/** Configuração do servidor, ou null se ainda não tiver os dois canais escolhidos. */
+/**
+ * Server configuration, or null until both channels have been chosen.
+ * Fields added in later versions get their defaults.
+ * @returns {ConfigServidor | null}
+ */
 function obterConfig(guildId) {
     const cfg = dados.guilds[guildId]?.config;
-    return cfg?.birthdayChannelId && cfg?.generalChannelId ? cfg : null;
+    return cfg?.birthdayChannelId && cfg?.generalChannelId ? { ...configPorOmissao(), ...cfg } : null;
 }
 
 /** @returns {[string, ConfigServidor][]} */

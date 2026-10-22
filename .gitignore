@@ -7,5 +7,5 @@ yarn-error.log
 .env
 
 
-# Estado do bot
+# Bot state
 data/

@@ -1,5 +1,6 @@
 const path = require('path');
 require('dotenv').config();
+const { IDIOMAS, IDIOMA_POR_OMISSAO } = require('./i18n');
 
 function obrigatoria(nome) {
     const valor = process.env[nome]?.trim();
@@ -31,17 +32,20 @@ const config = {
     BOT_TOKEN: obrigatoria('BOT_TOKEN'),
     DATA_DIR: path.resolve(opcional('DATA_DIR') || path.join(__dirname, '..', 'data')),
 
-    // Valores por omissão para servidores novos (cada servidor muda-os no painel)
+    // Defaults for new servers (each server can change them in the panel)
     DEFAULT_TIMEZONE: opcional('TIMEZONE') || 'Europe/Lisbon',
     DEFAULT_CHECK_TIME: opcional('CHECK_TIME') || '00:01',
-    DEFAULT_MESSAGE: opcional('BIRTHDAY_MESSAGE') || '🎉 Hoje é o teu dia, {user}! 🎂 Feliz aniversário!',
+    DEFAULT_LANGUAGE: opcional('BOT_LANGUAGE') || IDIOMA_POR_OMISSAO,
+    LANGUAGE_SET: Boolean(opcional('BOT_LANGUAGE')),
+    // Custom birthday message; when empty, each server uses the default for its language
+    DEFAULT_MESSAGE: opcional('BIRTHDAY_MESSAGE'),
     DEFAULT_MONTHLY_SUMMARY: opcional('MONTHLY_SUMMARY')?.toLowerCase() !== 'false',
 
-    // Configuração antiga de um só servidor; migrada automaticamente no primeiro arranque
+    // Old single-server configuration; migrated automatically on first start
     LEGACY_BIRTHDAY_CHANNEL_ID: opcional('BIRTHDAY_CHANNEL_ID'),
     LEGACY_GENERAL_CHANNEL_ID: opcional('GENERAL_CHANNEL_ID'),
 
-    // Painel web (só arranca se PUBLIC_URL e DISCORD_CLIENT_SECRET estiverem definidos)
+    // Web panel (only starts when both PUBLIC_URL and DISCORD_CLIENT_SECRET are set)
     PUBLIC_URL: opcional('PUBLIC_URL')?.replace(/\/+$/, '') ?? null,
     DISCORD_CLIENT_SECRET: opcional('DISCORD_CLIENT_SECRET'),
     WEB_HOST: opcional('WEB_HOST') || '0.0.0.0',
@@ -55,6 +59,10 @@ if (!horaValida(config.DEFAULT_CHECK_TIME)) {
 }
 if (!fusoValido(config.DEFAULT_TIMEZONE)) {
     console.error(`❌ Invalid TIMEZONE: "${config.DEFAULT_TIMEZONE}" (e.g. Europe/Lisbon)`);
+    process.exit(1);
+}
+if (!IDIOMAS[config.DEFAULT_LANGUAGE]) {
+    console.error(`❌ Invalid BOT_LANGUAGE: "${config.DEFAULT_LANGUAGE}" (one of: ${Object.keys(IDIOMAS).join(', ')})`);
     process.exit(1);
 }
 if (config.PUBLIC_URL && !/^https?:\/\/[^/]+$/.test(config.PUBLIC_URL)) {

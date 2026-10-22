@@ -5,7 +5,7 @@ const store = require('./store');
 const ESPERA_APOS_ERRO_MS = 5 * 60 * 1000;
 
 /**
- * Data e hora atuais no fuso horário indicado.
+ * Current date and time in the given timezone.
  */
 function agoraNoFuso(timeZone) {
     const partes = Object.fromEntries(
@@ -28,8 +28,8 @@ const aCorrer = new Set();
 const proximaTentativa = new Map();
 
 /**
- * Faz a verificação de hoje de um servidor. Como o estado fica em disco,
- * reinícios não duplicam mensagens. Em caso de erro, tenta de novo daqui a 5 min.
+ * Runs today's check for one server. State is kept on disk, so restarts never
+ * send duplicate messages. On error, it retries 5 minutes later.
  * @param {import('discord.js').Client} client
  * @param {string} guildId
  * @param {import('./store').ConfigServidor} cfg
@@ -42,7 +42,7 @@ async function verificarServidor(client, guildId, cfg) {
     aCorrer.add(guildId);
     const enviados = new Set(estado.data === agora.data ? estado.enviados : []);
     const mesAtual = agora.data.slice(0, 7);
-    let { resumo } = estado; // último mês (AAAA-MM) com resumo enviado
+    let { resumo } = estado;
     const guardar = (concluido) => store.guardarEstado(guildId, { data: agora.data, enviados: [...enviados], concluido, resumo });
 
     try {
@@ -71,8 +71,8 @@ async function verificarServidor(client, guildId, cfg) {
 }
 
 /**
- * Corre a verificação de cada servidor que já passou a sua hora e ainda não foi verificado hoje.
- * Também apanha o dia de hoje se o bot esteve em baixo à hora marcada.
+ * Checks every server that has passed its check time and hasn't been checked today.
+ * This also catches up on today if the bot was down at the scheduled time.
  */
 function tick(client) {
     for (const [guildId, cfg] of store.servidoresConfigurados()) {
@@ -89,8 +89,8 @@ function tick(client) {
 }
 
 /**
- * Cada servidor tem a sua hora e fuso, por isso o cron corre de minuto a minuto
- * e o tick decide que servidores já chegaram à hora.
+ * Each server has its own time and timezone, so cron runs every minute
+ * and the tick decides which servers are due.
  * @param {import('discord.js').Client} client
  */
 function iniciarAgendador(client) {
@@ -99,14 +99,21 @@ function iniciarAgendador(client) {
     tick(client);
 }
 
-/** Estado da próxima verificação de um servidor, para o /aniversario-status e o painel. */
+/** When a server's next check happens, for /birthday-status and the panel. */
 function proximaVerificacao(guildId, cfg) {
     const agora = agoraNoFuso(cfg.timezone);
     const estado = store.lerEstado(guildId);
-    if (!cfg.enabled) return 'desligada';
-    if (estado.data === agora.data && estado.concluido) return `amanhã às ${cfg.checkTime} (${cfg.timezone})`;
-    if (agora.horaMinuto < cfg.checkTime) return `hoje às ${cfg.checkTime} (${cfg.timezone})`;
-    return 'a decorrer, a tentar de novo de 5 em 5 min';
+    if (!cfg.enabled) return 'off';
+    if (estado.data === agora.data && estado.concluido) return `tomorrow at ${cfg.checkTime} (${cfg.timezone})`;
+    if (agora.horaMinuto < cfg.checkTime) return `today at ${cfg.checkTime} (${cfg.timezone})`;
+    return 'in progress, retrying every 5 min';
 }
 
-module.exports = { agoraNoFuso, iniciarAgendador, proximaVerificacao };
+/** "22/10/2026 ✅" for the last check, for /birthday-status and the panel. */
+function ultimaVerificacao(guildId) {
+    const estado = store.lerEstado(guildId);
+    if (!estado.data) return 'none yet';
+    return `${estado.data.split('-').reverse().join('/')} ${estado.concluido ? '✅' : '⚠ incomplete'}`;
+}
+
+module.exports = { agoraNoFuso, iniciarAgendador, proximaVerificacao, ultimaVerificacao };

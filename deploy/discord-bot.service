@@ -8,7 +8,7 @@ Type=simple
 User=discordbot
 Group=discordbot
 WorkingDirectory=/opt/discord-bot
-# Lido pelo systemd (root), por isso o .env pode ficar só legível pelo root
+# Read by systemd (as root), so the .env can stay readable by root only
 EnvironmentFile=/opt/discord-bot/.env
 Environment=NODE_ENV=production
 Environment=DATA_DIR=/opt/discord-bot/data

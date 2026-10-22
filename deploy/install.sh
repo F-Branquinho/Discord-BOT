@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Instala ou atualiza o bot num LXC/VM Debian ou Ubuntu. Correr como root.
+# Installs or updates the bot on a Debian or Ubuntu LXC/VM. Run as root.
 #
-# Versão a instalar (argumento ou VERSION=...):
-#   latest   a release mais recente (por omissão)
-#   v2.2.0   uma release específica (tag do GitHub)
-#   main     o código mais recente, ainda sem release
-#   --list   mostra as versões disponíveis e a instalada, sem mudar nada
+# Version to install (argument or VERSION=...):
+#   latest   the most recent release (default)
+#   v2.2.0   a specific release (GitHub tag)
+#   main     the latest code, not released yet
+#   --list   shows the available and installed versions without changing anything
 set -euo pipefail
 
 export LANG=C.UTF-8 LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive
