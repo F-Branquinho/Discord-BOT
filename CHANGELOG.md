@@ -2,6 +2,10 @@
 
 Each version is a GitHub tag. To install a specific version, see [Versions](README.md#versions) in the README.
 
+## v3.4.0
+
+- When several people have their birthday on the same day, they get one message together ("Hoje é o vosso dia, @Ana e @Rui!") instead of one each.
+
 ## v3.3.1
 
 - In the server settings, the custom message placeholder switches to the chosen language right away, without saving first.

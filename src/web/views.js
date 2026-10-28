@@ -334,7 +334,7 @@ ${cartaoResumo}
 
   <label for="message">Custom birthday message (optional)</label>
   <textarea id="message" name="message" maxlength="1500" placeholder="${esc(idiomas[cfg.language]?.mensagemAniversario)}">${esc(cfg.message)}</textarea>
-  <div class="ajuda"><code>{user}</code> is replaced by the birthday person's mention. Leave empty to use the default for the chosen language:
+  <div class="ajuda"><code>{user}</code> is replaced by the birthday person's mention. When several people have their birthday on the same day, they get one message together (e.g. <code>@Ana and @Rui</code>). Leave empty to use the default for the chosen language:
     <ul class="lista">${Object.values(idiomas).map((i) => `<li>${esc(i.nome)}: ${esc(i.mensagemAniversario)}</li>`).join('')}</ul></div>
 
   <label class="caixa"><input type="checkbox" name="monthlySummary"${cfg.monthlySummary ? ' checked' : ''}> Post the month's birthdays on the 1st</label>

@@ -6,12 +6,15 @@ const IDIOMAS = {
         nome: 'English',
         locale: 'en-US',
         mensagemAniversario: '🎉 Happy birthday, {user}! 🎂 Have an amazing day!',
+        // Used when several people have their birthday on the same day
+        mensagemAniversarioVarios: '🎉 Happy birthday, {user}! 🎂 Have an amazing day!',
         tituloResumo: (mes) => `📅 **Birthdays in ${mes}**`,
     },
     pt: {
         nome: 'Português',
         locale: 'pt-PT',
         mensagemAniversario: '🎉 Hoje é o teu dia, {user}! 🎂 Feliz aniversário!',
+        mensagemAniversarioVarios: '🎉 Hoje é o vosso dia, {user}! 🎂 Feliz aniversário!',
         tituloResumo: (mes) => `📅 **Aniversários de ${mes}**`,
     },
 };

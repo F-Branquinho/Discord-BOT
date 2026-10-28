@@ -82,8 +82,13 @@ function aniversariosDoMes(lista, mes) {
  * The birthday message for a user: the server's custom message, or the default for its language.
  * @param {import('./store').ConfigServidor} cfg
  */
-function mensagemAniversario(cfg, userId) {
-    return (cfg.message || idioma(cfg.language).mensagemAniversario).replaceAll('{user}', `<@${userId}>`);
+function mensagemAniversario(cfg, userIds) {
+    const ids = [].concat(userIds);
+    const lingua = idioma(cfg.language);
+    const modelo = cfg.message || (ids.length > 1 ? lingua.mensagemAniversarioVarios : lingua.mensagemAniversario);
+    // "@a", "@a and @b", "@a, @b and @c" in the server's language
+    const mencoes = new Intl.ListFormat(lingua.locale, { type: 'conjunction' }).format(ids.map((id) => `<@${id}>`));
+    return modelo.replaceAll('{user}', mencoes);
 }
 
 /**
@@ -131,22 +136,23 @@ async function verificarAniversarios(client, cfg, lista, hoje, jaEnviados, aoEnv
 
     const canalGeral = await obterCanal(client, cfg.generalChannelId, 'General');
 
+    const presentes = [];
     for (const { userId } of aniversariantes) {
         try {
             await canalGeral.guild.members.fetch(userId);
+            presentes.push(userId);
         } catch (error) {
-            if (error.code === RESTJSONErrorCodes.UnknownMember) {
-                console.warn(`⚠ User ${userId} is no longer in the server, skipping`);
-                aoEnviar(userId);
-                continue;
-            }
-            throw error;
+            if (error.code !== RESTJSONErrorCodes.UnknownMember) throw error;
+            console.warn(`⚠ User ${userId} is no longer in the server, skipping`);
+            aoEnviar(userId);
         }
-
-        await canalGeral.send({ content: mensagemAniversario(cfg, userId), allowedMentions: { users: [userId] } });
-        console.log(`📢 Birthday message sent to ${userId}`);
-        aoEnviar(userId);
     }
+    if (presentes.length === 0) return;
+
+    // One message for everyone celebrating today
+    await canalGeral.send({ content: mensagemAniversario(cfg, presentes), allowedMentions: { users: presentes } });
+    console.log(`📢 Birthday message sent to ${presentes.join(', ')}`);
+    for (const userId of presentes) aoEnviar(userId);
 }
 
 module.exports = {
